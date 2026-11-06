@@ -161,7 +161,7 @@ async function createClient(client: CreateClientBody): Promise<Client | undefine
 }
 
 const gridTemplate = computed(() => {
-    return `grid-template-columns: minmax(300px, 1fr) minmax(150px, auto) minmax(140px, auto) minmax(130px, auto) ${props.showBillableRate ? 'minmax(130px, auto)' : ''} minmax(120px, auto) minmax(120px, auto) 80px;`;
+    return `grid-template-columns: minmax(12rem, 1fr) var(--progress-column) repeat(2, max-content) var(--progress-column) ${props.showBillableRate ? 'max-content' : ''} max-content max-content max-content;`;
 });
 </script>
 
@@ -176,7 +176,10 @@ const gridTemplate = computed(() => {
         :enable-estimated-time="isAllowedToPerformPremiumAction()"></ProjectCreateModal>
     <div class="flow-root max-w-[100vw] overflow-x-auto">
         <div class="inline-block min-w-full align-middle">
-            <div data-testid="project_table" class="grid min-w-full" :style="gridTemplate">
+            <div
+                data-testid="project_table"
+                class="project-grid grid min-w-full"
+                :style="gridTemplate">
                 <ProjectTableHeading
                     :show-billable-rate="props.showBillableRate"
                     :sort-column="props.sortColumn"
@@ -216,3 +219,19 @@ const gridTemplate = computed(() => {
         :total="sortedProjects.length"
         :items-per-page="PAGE_SIZE"></Pagination>
 </template>
+
+<style scoped>
+.project-grid {
+    --cell-inset: clamp(0.75rem, calc(3vw - 2rem), 2rem);
+    --progress-column: calc(8.5rem + 2 * var(--cell-inset));
+}
+
+.project-grid :deep(.contents > :not(:first-child, :last-child)) {
+    padding-inline: var(--cell-inset);
+}
+
+/* Let the sort arrow use the cell padding without widening short text columns. */
+.project-grid :deep(.contents > button > [aria-hidden='true']) {
+    margin-right: -1rem;
+}
+</style>

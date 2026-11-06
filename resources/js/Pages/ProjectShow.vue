@@ -74,14 +74,14 @@ const { tableState, handleSort } = useTableSortState<SortColumn>('task-table-sta
     sortDirection: 'asc',
 });
 
-const shownTasks = computed(() => {
-    return tasks.value.filter((task) => {
-        if (activeTab.value === 'active') {
-            return task.project_id === projectId && !task.is_done;
-        }
-        return task.project_id === projectId && task.is_done;
-    });
-});
+const projectTasks = computed(() => tasks.value.filter((task) => task.project_id === projectId));
+const completedTasksCount = computed(
+    () => projectTasks.value.filter((task) => task.is_done).length
+);
+const activeTasksCount = computed(() => projectTasks.value.length - completedTasksCount.value);
+const shownTasks = computed(() =>
+    projectTasks.value.filter((task) => task.is_done === (activeTab.value === 'done'))
+);
 
 // Note: The page sits above the app layout that provides the lock, so it can not inject it
 const billableRatesLocked = computed(() => !canUseBillableRates());
@@ -160,8 +160,12 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                             <div class="w-full items-center flex justify-between">
                                 <div class="pl-6">
                                     <TabBar v-model="activeTab">
-                                        <TabBarItem value="active">Active </TabBarItem>
-                                        <TabBarItem value="done">Done </TabBarItem>
+                                        <TabBarItem value="active">
+                                            Active ({{ activeTasksCount }})
+                                        </TabBarItem>
+                                        <TabBarItem value="done">
+                                            Done ({{ completedTasksCount }})
+                                        </TabBarItem>
                                     </TabBar>
                                 </div>
                                 <SecondaryButton

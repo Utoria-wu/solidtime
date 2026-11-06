@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useBillableRatesLock } from '@/packages/ui/src/utils/useBillableRatesLock';
 import ProjectMoreOptionsDropdown from '@/Components/Common/Project/ProjectMoreOptionsDropdown.vue';
+import ProjectTaskProgress from '@/Components/Common/Project/ProjectTaskProgress.vue';
 import type { Project } from '@/packages/api/src';
 import { computed, ref, inject, type ComputedRef } from 'vue';
 import { CheckCircleIcon, ArchiveBoxIcon } from '@heroicons/vue/24/outline';
@@ -34,7 +35,7 @@ import {
 } from '@/packages/ui/src';
 
 const { clients } = useClientsQuery();
-const { tasks } = useTasksQuery();
+const { tasks, isPending: isTasksPending, isError: isTasksError } = useTasksQuery();
 
 const props = defineProps<{
     project: Project;
@@ -45,8 +46,8 @@ const client = computed(() => {
     return clients.value.find((client) => client.id === props.project.client_id);
 });
 
-const projectTasksCount = computed(() => {
-    return tasks.value.filter((task) => task.project_id === props.project.id).length;
+const projectTasks = computed(() => {
+    return tasks.value.filter((task) => task.project_id === props.project.id);
 });
 
 function deleteProject() {
@@ -98,15 +99,22 @@ const { locked: billableRatesLocked } = useBillableRatesLock();
                             backgroundColor: project.color,
                             boxShadow: `var(--tw-ring-inset) 0 0 0 calc(4px + var(--tw-ring-offset-width)) ${project.color}30`,
                         }"
-                        class="w-3 h-3 ml-1 rounded-full"></div>
+                        class="w-3 h-3 ml-1 rounded-full shrink-0"></div>
                     <span class="overflow-ellipsis overflow-hidden">
                         {{ project.name }}
                     </span>
-                    <span class="text-text-secondary"> {{ projectTasksCount }} Tasks </span>
+                </div>
+                <div
+                    data-testid="project_tasks"
+                    class="whitespace-nowrap min-w-0 min-h-[60px] px-3 py-4 flex items-center text-sm text-text-primary">
+                    <ProjectTaskProgress
+                        :tasks="projectTasks"
+                        :is-loading="isTasksPending"
+                        :is-error="isTasksError" />
                 </div>
                 <div
                     class="whitespace-nowrap min-w-0 px-3 py-4 flex items-center text-sm text-text-primary">
-                    <div v-if="project.client_id" class="overflow-ellipsis overflow-hidden">
+                    <div v-if="project.client_id" class="max-w-48 truncate" :title="client?.name">
                         {{ client?.name }}
                     </div>
                     <div v-else class="text-text-tertiary">No client</div>
