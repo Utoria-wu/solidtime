@@ -2,7 +2,9 @@
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import { PlusCircleIcon } from '@heroicons/vue/24/solid';
 import { PlusIcon } from '@heroicons/vue/16/solid';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { useTimestamp } from '@vueuse/core';
+import { useTaskTimers } from '@/utils/useTaskTimers';
 import TaskTableRow from '@/Components/Common/Task/TaskTableRow.vue';
 import TaskTableHeading from '@/Components/Common/Task/TaskTableHeading.vue';
 import TaskCreateModal from '@/Components/Common/Task/TaskCreateModal.vue';
@@ -65,11 +67,15 @@ function handleSort(column: SortColumn) {
 }
 
 const createTask = ref(false);
+const { timers, change, ready } = useTaskTimers();
+const timersByTask = computed(() => new Map(timers.value.map((timer) => [timer.task_id, timer])));
+const timestamp = useTimestamp({ interval: 1000 });
+const now = computed(() => Math.floor(timestamp.value / 1000));
 </script>
 
 <template>
     <TaskCreateModal v-model:show="createTask" :project-id="props.projectId"></TaskCreateModal>
-    <div class="flow-root">
+    <div class="flow-root overflow-x-auto">
         <div class="inline-block min-w-full align-middle">
             <div
                 data-testid="task_table"
@@ -77,8 +83,8 @@ const createTask = ref(false);
                 class="grid min-w-full"
                 style="
                     grid-template-columns:
-                        1fr minmax(80px, auto) minmax(120px, auto) minmax(50px, auto)
-                        80px;
+                        minmax(10rem, 1fr) minmax(80px, auto) minmax(95px, auto) 8rem
+                        8rem;
                 ">
                 <TaskTableHeading
                     :sort-column="sortColumn"
@@ -97,7 +103,12 @@ const createTask = ref(false);
                     </SecondaryButton>
                 </div>
                 <template v-for="task in sortedTasks" :key="task.id">
-                    <TaskTableRow :task="task"></TaskTableRow>
+                    <TaskTableRow
+                        :task="task"
+                        :timer="timersByTask.get(task.id)"
+                        :timer-ready="ready"
+                        :now="now"
+                        :change="change"></TaskTableRow>
                 </template>
             </div>
         </div>
