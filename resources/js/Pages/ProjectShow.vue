@@ -33,6 +33,7 @@ import { getOrganizationCurrencyString } from '../utils/money';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
 import { getCurrentOrganizationId } from '@/utils/useUser';
 import { useTableSortState } from '@/utils/useTableSortState';
+import { useTaskTimers } from '@/utils/useTaskTimers';
 
 const { projects } = useProjectsQuery();
 
@@ -43,6 +44,7 @@ const project = computed(() => {
 });
 const createTask = ref(false);
 const createProjectMember = ref(false);
+const showMembers = ref(false);
 const projectId = route()?.params?.project as string;
 
 // TanStack Query automatically fetches project members when component mounts
@@ -68,6 +70,14 @@ const billableRateFormatted = computed(() => {
 const activeTab = ref<'active' | 'done'>('active');
 
 const { tasks } = useTasksQuery();
+const { timers } = useTaskTimers();
+const runningCount = computed(() => {
+    const taskIds = new Set(
+        tasks.value.filter((task) => task.project_id === projectId).map((task) => task.id)
+    );
+    return timers.value.filter((timer) => timer.started_at !== null && taskIds.has(timer.task_id))
+        .length;
+});
 
 const { tableState, handleSort } = useTableSortState<SortColumn>('task-table-state', {
     sortColumn: 'name',
@@ -90,7 +100,7 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
 <template>
     <AppLayout title="Projects" data-testid="projects_view">
         <MainContainer
-            class="py-5 border-b border-default-background-separator flex justify-between items-center">
+            class="py-5 border-b border-default-background-separator flex flex-wrap gap-3 justify-between items-center">
             <nav class="flex" aria-label="Breadcrumb">
                 <ol role="list" class="flex items-center space-x-2">
                     <li>
@@ -139,7 +149,15 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                     <Badge>{{ project?.is_public ? 'Public' : 'Private' }}</Badge>
                 </div>
             </nav>
-            <div>
+            <div class="flex items-center gap-3">
+                <button
+                    v-if="canViewProjectMembers()"
+                    type="button"
+                    class="text-sm text-text-secondary hover:text-text-primary"
+                    :aria-expanded="showMembers"
+                    @click="showMembers = !showMembers">
+                    Members · {{ projectMembers.length }}
+                </button>
                 <SecondaryButton
                     v-if="canCreateProjects()"
                     :icon="PencilSquareIcon"
@@ -153,7 +171,7 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
             </div>
         </MainContainer>
         <MainContainer>
-            <div class="grid lg:grid-cols-2 gap-x-6 pt-6">
+            <div class="grid grid-cols-1 gap-6 pt-6">
                 <div>
                     <CardTitle title="Tasks" :icon="CheckCircleIcon">
                         <template #actions>
@@ -164,6 +182,9 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                                         <TabBarItem value="done">Done </TabBarItem>
                                     </TabBar>
                                 </div>
+                                <span v-if="runningCount" class="text-xs text-text-secondary">
+                                    {{ runningCount }} running
+                                </span>
                                 <SecondaryButton
                                     v-if="canCreateTasks()"
                                     :icon="PlusIcon"
@@ -176,16 +197,16 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                             </div>
                         </template>
                     </CardTitle>
-                    <Card>
+                    <div class="[&_[role=row]>*]:bg-transparent">
                         <TaskTable
                             :tasks="shownTasks"
                             :project-id="projectId"
                             :sort-column="tableState.sortColumn"
                             :sort-direction="tableState.sortDirection"
                             @sort="handleSort"></TaskTable>
-                    </Card>
+                    </div>
                 </div>
-                <div v-if="canViewProjectMembers()">
+                <div v-if="canViewProjectMembers() && showMembers">
                     <CardTitle title="Project Members" :icon="UserGroupIcon">
                         <template #actions>
                             <SecondaryButton :icon="PlusIcon" @click="createProjectMember = true">

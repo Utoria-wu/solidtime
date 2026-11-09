@@ -6,10 +6,24 @@ import dayjs from 'dayjs';
 import { formatDuration } from '@/packages/ui/src/utils/time';
 import TimeTrackerStartStop from '@/packages/ui/src/TimeTrackerStartStop.vue';
 import { getCurrentOrganizationId } from '@/utils/useUser';
+import { Link } from '@inertiajs/vue3';
+import { useTimestamp } from '@vueuse/core';
+import { useTasksQuery } from '@/utils/useTasksQuery';
+import { elapsedTaskSeconds, useTaskTimers } from '@/utils/useTaskTimers';
 
 const store = useCurrentTimeEntryStore();
 const { currentTimeEntry, now, isActive } = storeToRefs(store);
 const { setActiveState } = store;
+const { timers } = useTaskTimers();
+const { tasks } = useTasksQuery();
+const timestamp = useTimestamp({ interval: 1000 });
+const runningTasks = computed(() => {
+    const taskById = new Map(tasks.value.map((task) => [task.id, task]));
+    return timers.value.flatMap((timer) => {
+        const task = taskById.get(timer.task_id);
+        return timer.started_at !== null && task ? [{ timer, task }] : [];
+    });
+});
 
 const currentTime = computed(() => {
     if (now.value && currentTimeEntry.value.start) {
@@ -54,4 +68,18 @@ const isRunningInDifferentOrganization = computed(() => {
             variant="secondary"
             @changed="setActiveState"></TimeTrackerStartStop>
     </div>
+    <details v-if="runningTasks.length" class="px-2 pb-2 text-xs text-text-secondary">
+        <summary class="cursor-pointer py-1">{{ runningTasks.length }} task timers running</summary>
+        <Link
+            v-for="{ timer, task } in runningTasks"
+            :key="timer.id"
+            :href="route('projects.show', { project: task.project_id })"
+            class="flex items-center justify-between gap-2 py-1 hover:text-text-primary"
+            :title="task.name">
+            <span class="truncate">{{ task.name }}</span>
+            <span class="tabular-nums">
+                {{ formatDuration(elapsedTaskSeconds(timer, Math.floor(timestamp / 1000))) }}
+            </span>
+        </Link>
+    </details>
 </template>

@@ -45,6 +45,10 @@ export function canUpdateTasks() {
     return currentUserHasPermission('tasks:update');
 }
 
+export function canCreateOwnTimeEntries() {
+    return currentUserHasPermission('time-entries:create:own');
+}
+
 export function canDeleteTasks() {
     return currentUserHasPermission('tasks:delete');
 }
