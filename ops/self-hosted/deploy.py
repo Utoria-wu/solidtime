@@ -1,6 +1,7 @@
 """Deploy a prebuilt image to the existing Solidtime stack; restore image on failure.
 
-No schema migrations. Runtime config and backups stay on the server, never in Git.
+Optional reviewed migrations run after backup and before the container switch.
+Runtime config and backups stay on the server, never in Git.
 Run: python3 deploy.py --image TAG --expected-old-image sha256:... --revision SHA
 """
 import argparse
@@ -9,6 +10,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import time
@@ -53,7 +55,11 @@ def main():
     parser.add_argument('--image', required=True)
     parser.add_argument('--expected-old-image', required=True)
     parser.add_argument('--revision', required=True)
+    parser.add_argument('--migration', action='append', default=[],
+                        help='Reviewed, rollback-compatible migration basename, including .php')
     args = parser.parse_args()
+    if any(not re.fullmatch(r'\d{4}_\d{2}_\d{2}_\d{6}_[a-z0-9_]+\.php', name) for name in args.migration):
+        parser.error('Expected migration basenames from database/migrations')
     os.chdir(ROOT)
     os.umask(0o077)
     before = {name: inspect(name) for name in [*SERVICES, 'database', 'gotenberg']}
@@ -86,6 +92,7 @@ def main():
     before_counts = counts()
     manifest = {'old_image': args.expected_old_image, 'new_image': new['Id'], 'image_tag': args.image,
                 'revision': args.revision, 'counts': before_counts, 'mounts': mounts,
+                'migrations': args.migration,
                 'backup': str(backup), 'database_container': before['database']['Id'],
                 'gotenberg_container': before['gotenberg']['Id']}
     save(backup / 'manifest.json', manifest)
@@ -107,6 +114,10 @@ def main():
         resolved = json.loads(output(compose('config', '--format', 'json')))
         if any(resolved['services'][s]['image'] != args.image for s in SERVICES):
             raise RuntimeError('Compose image selection failed')
+        if args.migration:
+            paths = ['--path=database/migrations/' + name for name in args.migration]
+            run(compose('run', '--rm', '-T', '--no-deps', '--entrypoint', 'php',
+                        'app', 'artisan', 'migrate', '--force', '--no-interaction', *paths))
         run(compose('up', '-d', '--no-deps', '--pull', 'never', *SERVICES))
         wait_healthy(new['Id'])
         for path in ['/health-check/up', '/login']:
