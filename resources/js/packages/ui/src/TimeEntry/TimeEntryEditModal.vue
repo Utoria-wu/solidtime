@@ -28,6 +28,8 @@ import { Coffee } from '@lucide/vue';
 import type { Tag, Task } from '@/packages/api/src';
 import TimePickerSimple from '@/packages/ui/src/Input/TimePickerSimple.vue';
 import { useBreaksEnabled } from '@/packages/ui/src/utils/useBreaksEnabled';
+import { useTasksStore } from '@/utils/useTasks';
+import { canUpdateTasks } from '@/utils/permissions';
 
 // Breaks may have been disabled after this entry was created, so an existing break can still be
 // edited (and converted back), but a work entry may only offer the break option when enabled.
@@ -36,6 +38,9 @@ const breaksEnabled = useBreaksEnabled();
 const show = defineModel('show', { default: false });
 const saving = ref(false);
 const deleting = ref(false);
+const { updateTask } = useTasksStore();
+const taskStatus = ref('active');
+const taskStatusChanged = ref(false);
 
 const props = defineProps<{
     timeEntry: TimeEntry | null;
@@ -65,13 +70,34 @@ watch(show, (value) => {
 });
 
 const editableTimeEntry = ref<TimeEntry | null>(null);
+const selectedTask = computed(() =>
+    props.tasks.find(
+        (task) =>
+            task.id === editableTimeEntry.value?.task_id &&
+            task.project_id === editableTimeEntry.value?.project_id
+    )
+);
+watch(
+    [show, () => props.timeEntry?.id, () => selectedTask.value?.id],
+    () => {
+        taskStatus.value = selectedTask.value?.is_done ? 'done' : 'active';
+        taskStatusChanged.value = false;
+    },
+    { immediate: true }
+);
+watch(
+    () => selectedTask.value?.is_done,
+    (isDone) => {
+        if (!taskStatusChanged.value) taskStatus.value = isDone ? 'done' : 'active';
+    }
+);
 const { locked: billableRatesLocked } = useBillableRatesLock();
 
 watch(
-    () => props.timeEntry,
-    (newTimeEntry) => {
+    [() => props.timeEntry, show],
+    ([newTimeEntry]) => {
         if (newTimeEntry) {
-            editableTimeEntry.value = { ...newTimeEntry };
+            editableTimeEntry.value = { ...newTimeEntry, tags: [...newTimeEntry.tags] };
         }
     },
     { immediate: true }
@@ -113,10 +139,19 @@ const localEnd = computed({
 });
 
 async function submit() {
+    if (saving.value || deleting.value) return;
     if (editableTimeEntry.value) {
+        const task = selectedTask.value;
+        const isDone = taskStatus.value === 'done';
+        const shouldUpdateTask =
+            task && canUpdateTasks() && taskStatusChanged.value && task.is_done !== isDone;
         saving.value = true;
         try {
             await props.updateTimeEntry(editableTimeEntry.value);
+            if (shouldUpdateTask) {
+                await updateTask(task.id, { name: task.name, is_done: isDone });
+                taskStatusChanged.value = false;
+            }
             show.value = false;
         } finally {
             saving.value = false;
@@ -260,6 +295,21 @@ const typeProxy = computed({
                         </Select>
                     </div>
                 </div>
+                <Field v-if="selectedTask && !isBreak && canUpdateTasks()" class="sm:max-w-48">
+                    <FieldLabel>Task status</FieldLabel>
+                    <Select
+                        v-model="taskStatus"
+                        :disabled="saving || deleting"
+                        @update:model-value="taskStatusChanged = true">
+                        <SelectTrigger aria-label="Task status">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="done">Done</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </Field>
                 <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 pt-4">
                     <Field class="col-span-2 sm:col-span-3">
                         <FieldLabel>Duration</FieldLabel>

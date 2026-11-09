@@ -131,8 +131,7 @@ function handleEdit() {
 }
 
 async function handleUpdateTimeEntry(updatedEntry: TimeEntry) {
-    props.updateTimeEntry(updatedEntry);
-    showEditModal.value = false;
+    await props.updateTimeEntry(updatedEntry);
 }
 
 async function handleDeleteTimeEntry() {
