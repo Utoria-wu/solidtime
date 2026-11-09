@@ -48,13 +48,19 @@ export function useTaskTimers() {
 
     const timers = computed(() => query.data.value ?? []);
 
-    async function change(taskId: string, action: TaskTimerAction, timer?: TaskTimer) {
+    async function change(
+        taskId: string,
+        action: TaskTimerAction,
+        timer?: TaskTimer,
+        description?: string
+    ) {
         const organization = getCurrentOrganizationId();
         if (!organization) return;
         const body = {
             action,
             session_id: timer?.id,
             version: timer?.version ?? 0,
+            description,
         };
 
         try {
