@@ -53,7 +53,7 @@ export function useTaskTimers() {
         if (!organization) return;
         const body = {
             action,
-            session_id: timer?.id ?? crypto.randomUUID(),
+            session_id: timer?.id,
             version: timer?.version ?? 0,
         };
 
