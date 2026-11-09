@@ -56,6 +56,7 @@ class TaskTimerController extends Controller
             'action' => 'required|in:start,pause,resume,complete',
             'session_id' => 'required_unless:action,start|uuid',
             'version' => 'required|integer|min:0',
+            'description' => 'sometimes|required|string|max:5000',
         ]);
         $action = $input['action'];
         if (in_array($action, ['start', 'resume', 'complete'], true) && ! $this->hasPermission($organization, 'tasks:update:all')) {
@@ -120,7 +121,8 @@ class TaskTimerController extends Controller
                 return 0;
             }
 
-            $count = $this->saveEntries($organization, $member, $project, $task, $session);
+            $description = $input['description'] ?? $task->name;
+            $count = $this->saveEntries($organization, $member, $project, $task, $session, $description);
             // The Done list refreshes as soon as this transaction commits.
             $task->setComputedAttributeValue('spent_time');
             $task->done_at ??= $now;
@@ -133,7 +135,7 @@ class TaskTimerController extends Controller
         return response()->json(['saved_entries' => $saved]);
     }
 
-    private function saveEntries(Organization $organization, Member $member, Project $project, Task $task, TaskTimerSession $session): int
+    private function saveEntries(Organization $organization, Member $member, Project $project, Task $task, TaskTimerSession $session, string $description): int
     {
         $billable = $project->is_billable && $this->canUseBillableRates($organization);
         foreach ($session->segments as $segment) {
@@ -155,7 +157,7 @@ class TaskTimerController extends Controller
             $entry->project()->associate($project);
             $entry->task()->associate($task);
             $entry->client()->associate($project->client_id);
-            $entry->description = $task->name;
+            $entry->description = $description;
             $entry->start = $start;
             $entry->end = $end;
             $entry->billable = $billable;
