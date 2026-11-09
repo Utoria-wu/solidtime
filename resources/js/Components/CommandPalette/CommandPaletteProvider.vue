@@ -138,7 +138,6 @@ async function createTag(name: string): Promise<Tag | undefined> {
 
 async function createTimeEntry(timeEntry: Omit<CreateTimeEntryBody, 'member_id'>) {
     await createTimeEntryMutation(timeEntry);
-    showCreateTimeEntryModal.value = false;
 }
 
 async function handleProjectTaskSelect() {
