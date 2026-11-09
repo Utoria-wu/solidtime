@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Endpoint\Api\V1;
 
+use App\Jobs\RecalculateSpentTimeForTask;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TimeEntry;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Queue;
 use Laravel\Passport\Passport;
 
 class TaskTimerEndpointTest extends ApiEndpointTestAbstract
@@ -15,7 +17,7 @@ class TaskTimerEndpointTest extends ApiEndpointTestAbstract
     public function test_parallel_timers_keep_pause_gaps_and_complete_only_the_selected_task(): void
     {
         $data = $this->createUserWithPermission([
-            'time-entries:create:own', 'tasks:update:all', 'tasks:view:all', 'projects:view:all',
+            'time-entries:create:own', 'tasks:update:all', 'tasks:view', 'tasks:view:all', 'projects:view:all',
         ]);
         Passport::actingAs($data->user);
         $project = Project::factory()->forOrganization($data->organization)->create();
@@ -37,7 +39,12 @@ class TaskTimerEndpointTest extends ApiEndpointTestAbstract
         $this->travel(20)->minutes();
 
         $body = ['action' => 'complete', 'session_id' => $firstId, 'version' => 2];
+        Queue::fake([RecalculateSpentTimeForTask::class]);
         $this->postJson($firstUrl, $body)->assertOk()->assertJsonPath('saved_entries', 2);
+        $this->getJson(route('api.v1.tasks.index', [$data->organization, 'done' => 'true']))
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.spent_time', 2400);
         $this->postJson($firstUrl, $body)->assertOk()->assertJsonPath('saved_entries', 0);
         $this->getJson($indexUrl)
             ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.task_id', $second->id);
