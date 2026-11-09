@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Jobs\RecalculateSpentTimeForProject;
-use App\Jobs\RecalculateSpentTimeForTask;
 use App\Models\Member;
 use App\Models\Organization;
 use App\Models\Project;
@@ -122,6 +121,8 @@ class TaskTimerController extends Controller
             }
 
             $count = $this->saveEntries($organization, $member, $project, $task, $session);
+            // The Done list refreshes as soon as this transaction commits.
+            $task->setComputedAttributeValue('spent_time');
             $task->done_at ??= $now;
             $task->save();
             $session->delete();
@@ -163,7 +164,6 @@ class TaskTimerController extends Controller
             $entry->save();
         }
 
-        RecalculateSpentTimeForTask::dispatch($task)->afterCommit();
         RecalculateSpentTimeForProject::dispatch($project)->afterCommit();
 
         return count($session->segments);
