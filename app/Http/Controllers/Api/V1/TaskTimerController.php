@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class TaskTimerController extends Controller
 {
@@ -54,7 +55,7 @@ class TaskTimerController extends Controller
 
         $input = $request->validate([
             'action' => 'required|in:start,pause,resume,complete',
-            'session_id' => 'required|uuid',
+            'session_id' => 'required_unless:action,start|uuid',
             'version' => 'required|integer|min:0',
         ]);
         $action = $input['action'];
@@ -78,7 +79,7 @@ class TaskTimerController extends Controller
             if ($action === 'start') {
                 if ($session === null) {
                     $session = new TaskTimerSession;
-                    $session->id = $input['session_id'];
+                    $session->id = (string) Str::uuid();
                     $session->task_id = $task->id;
                     $session->member_id = $member->id;
                     $session->segments = [];

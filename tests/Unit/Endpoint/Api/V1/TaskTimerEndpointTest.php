@@ -8,7 +8,6 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\TimeEntry;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 use Laravel\Passport\Passport;
 
 class TaskTimerEndpointTest extends ApiEndpointTestAbstract
@@ -24,13 +23,13 @@ class TaskTimerEndpointTest extends ApiEndpointTestAbstract
         $second = Task::factory()->forOrganization($data->organization)->for($project)->create();
         $firstUrl = route('api.v1.tasks.timers.update', [$data->organization, $first]);
         $secondUrl = route('api.v1.tasks.timers.update', [$data->organization, $second]);
-        $firstId = (string) Str::uuid();
-        $secondId = (string) Str::uuid();
+        $indexUrl = route('api.v1.tasks.timers.index', [$data->organization]);
 
         $this->travelTo(Carbon::parse('2026-11-09 10:00:00', 'UTC'));
-        $this->postJson($firstUrl, ['action' => 'start', 'session_id' => $firstId, 'version' => 0])->assertOk();
+        $this->postJson($firstUrl, ['action' => 'start', 'version' => 0])->assertOk();
+        $firstId = $this->getJson($indexUrl)->assertOk()->json('data.0.id');
         $this->travel(10)->minutes();
-        $this->postJson($secondUrl, ['action' => 'start', 'session_id' => $secondId, 'version' => 0])->assertOk();
+        $this->postJson($secondUrl, ['action' => 'start', 'version' => 0])->assertOk();
         $this->travel(10)->minutes();
         $this->postJson($firstUrl, ['action' => 'pause', 'session_id' => $firstId, 'version' => 0])->assertOk();
         $this->travel(20)->minutes();
@@ -40,8 +39,8 @@ class TaskTimerEndpointTest extends ApiEndpointTestAbstract
         $body = ['action' => 'complete', 'session_id' => $firstId, 'version' => 2];
         $this->postJson($firstUrl, $body)->assertOk()->assertJsonPath('saved_entries', 2);
         $this->postJson($firstUrl, $body)->assertOk()->assertJsonPath('saved_entries', 0);
-        $this->getJson(route('api.v1.tasks.timers.index', [$data->organization]))
-            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $secondId);
+        $this->getJson($indexUrl)
+            ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.task_id', $second->id);
 
         $entries = TimeEntry::query()->whereBelongsTo($first, 'task')->orderBy('start')->get();
         $this->assertSame([
