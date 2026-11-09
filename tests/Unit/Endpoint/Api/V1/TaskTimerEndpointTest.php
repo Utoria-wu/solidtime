@@ -38,7 +38,12 @@ class TaskTimerEndpointTest extends ApiEndpointTestAbstract
         $this->postJson($firstUrl, ['action' => 'resume', 'session_id' => $firstId, 'version' => 1])->assertOk();
         $this->travel(20)->minutes();
 
-        $body = ['action' => 'complete', 'session_id' => $firstId, 'version' => 2];
+        $body = [
+            'action' => 'complete',
+            'session_id' => $firstId,
+            'version' => 2,
+            'description' => 'Review calendar entries',
+        ];
         Queue::fake([RecalculateSpentTimeForTask::class]);
         $this->postJson($firstUrl, $body)->assertOk()->assertJsonPath('saved_entries', 2);
         $this->getJson(route('api.v1.tasks.index', [$data->organization, 'done' => 'true']))
@@ -50,11 +55,13 @@ class TaskTimerEndpointTest extends ApiEndpointTestAbstract
             ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.task_id', $second->id);
 
         $entries = TimeEntry::query()->whereBelongsTo($first, 'task')->orderBy('start')->get();
+        $this->assertSame([$body['description'], $body['description']], $entries->pluck('description')->all());
         $this->assertSame([
             ['10:00', '10:20'],
             ['10:40', '11:00'],
         ], $entries->map(fn (TimeEntry $entry) => [$entry->start->format('H:i'), $entry->end?->format('H:i')])->all());
         $this->assertNotNull($first->fresh()->done_at);
+        $this->assertSame($first->name, $first->fresh()->name);
         $this->assertNull($second->fresh()->done_at);
         $this->assertSame(0, TimeEntry::query()->whereBelongsTo($second, 'task')->count());
     }
