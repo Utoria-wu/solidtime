@@ -21,10 +21,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Button } from '@/packages/ui/src/Buttons';
 import TimeRangeFields from '@/packages/ui/src/TimeEntry/TimeRangeFields.vue';
 import type { Tag, Task } from '@/packages/api/src';
+import { Field, FieldLabel } from '../field';
+import { useTasksStore } from '@/utils/useTasks';
+import { canUpdateTasks } from '@/utils/permissions';
 
 const show = defineModel('show', { default: false });
 const { locked: billableRatesLocked } = useBillableRatesLock();
 const saving = ref(false);
+const { updateTask } = useTasksStore();
+const taskStatus = ref('active');
+const taskStatusChanged = ref(false);
+const entryCreated = ref(false);
 
 const props = defineProps<{
     enableEstimatedTime: boolean;
@@ -47,6 +54,10 @@ const description = ref<HTMLInputElement | null>(null);
 
 watch(show, (value) => {
     if (value) {
+        timeEntry.value = { ...timeEntryDefaultValues, tags: [] };
+        localStart.value = getLocalizedDayJs(props.start ?? timeEntryDefaultValues.start).format();
+        localEnd.value = getLocalizedDayJs(props.end ?? timeEntryDefaultValues.end).format();
+        entryCreated.value = false;
         nextTick(() => {
             description.value?.focus();
         });
@@ -67,6 +78,26 @@ const timeEntryDefaultValues = {
 const timeEntry = ref({
     ...timeEntryDefaultValues,
 });
+const selectedTask = computed(() =>
+    props.tasks.find(
+        (task) =>
+            task.id === timeEntry.value.task_id && task.project_id === timeEntry.value.project_id
+    )
+);
+watch(
+    [show, () => selectedTask.value?.id],
+    () => {
+        taskStatus.value = selectedTask.value?.is_done ? 'done' : 'active';
+        taskStatusChanged.value = false;
+    },
+    { immediate: true }
+);
+watch(
+    () => selectedTask.value?.is_done,
+    (isDone) => {
+        if (!taskStatusChanged.value) taskStatus.value = isDone ? 'done' : 'active';
+    }
+);
 
 // update the localStart and localEnd when props.start or props.end get updates
 watch(
@@ -112,11 +143,24 @@ watch(localEnd, (value) => {
 });
 
 async function submit() {
-    await props.createTimeEntry({ ...timeEntry.value });
-    timeEntry.value = { ...timeEntryDefaultValues };
-    localStart.value = getLocalizedDayJs(timeEntryDefaultValues.start).format();
-    localEnd.value = getLocalizedDayJs(timeEntryDefaultValues.end).format();
-    show.value = false;
+    if (saving.value) return;
+    const task = selectedTask.value;
+    const isDone = taskStatus.value === 'done';
+    const shouldUpdateTask =
+        task && canUpdateTasks() && taskStatusChanged.value && task.is_done !== isDone;
+    saving.value = true;
+    try {
+        if (!entryCreated.value) {
+            await props.createTimeEntry({ ...timeEntry.value, tags: [...timeEntry.value.tags] });
+            entryCreated.value = true;
+        }
+        if (shouldUpdateTask) {
+            await updateTask(task.id, { name: task.name, is_done: isDone });
+        }
+        show.value = false;
+    } finally {
+        saving.value = false;
+    }
 }
 
 const billableProxy = computed({
@@ -128,7 +172,7 @@ const billableProxy = computed({
 </script>
 
 <template>
-    <DialogModal closeable :show="show" @close="show = false" @submit="submit">
+    <DialogModal :closeable="!saving" :show="show" @close="show = false" @submit="submit">
         <template #title>
             <div class="flex space-x-2">
                 <span> Create manual time entry </span>
@@ -136,84 +180,110 @@ const billableProxy = computed({
         </template>
 
         <template #content>
-            <div class="sm:flex items-end space-y-2 sm:space-y-0 sm:space-x-4">
-                <div class="flex-1">
-                    <TextInput
-                        id="description"
-                        ref="description"
-                        v-model="timeEntry.description"
-                        aria-label="Description"
-                        placeholder="What did you work on?"
-                        type="text"
-                        class="mt-1 block w-full"
-                        @keydown.enter="submit" />
+            <p v-if="entryCreated && !saving" role="alert" class="mb-4 text-text-secondary">
+                Time entry saved. Task status was not updated. Retry to save the task status.
+            </p>
+            <fieldset :disabled="saving || entryCreated" class="contents">
+                <div class="sm:flex items-end space-y-2 sm:space-y-0 sm:space-x-4">
+                    <div class="flex-1">
+                        <TextInput
+                            id="description"
+                            ref="description"
+                            v-model="timeEntry.description"
+                            aria-label="Description"
+                            placeholder="What did you work on?"
+                            type="text"
+                            class="mt-1 block w-full"
+                            @keydown.enter="submit" />
+                    </div>
                 </div>
-            </div>
-            <div class="flex flex-col sm:flex-row sm:items-end gap-2 pt-4">
-                <div class="flex-1 min-w-0">
-                    <TimeTrackerProjectTaskDropdown
-                        v-model:project="timeEntry.project_id"
-                        v-model:task="timeEntry.task_id"
-                        variant="input"
-                        size="default"
-                        :clients
-                        :create-project
-                        :create-client
-                        :can-create-project
-                        :currency
-                        :organization-billable-rate="organizationBillableRate"
-                        :projects="projects"
-                        :tasks="tasks"
-                        :enable-estimated-time="enableEstimatedTime" />
+                <div class="flex flex-col sm:flex-row sm:items-end gap-2 pt-4">
+                    <div class="flex-1 min-w-0">
+                        <TimeTrackerProjectTaskDropdown
+                            v-model:project="timeEntry.project_id"
+                            v-model:task="timeEntry.task_id"
+                            variant="input"
+                            size="default"
+                            :clients
+                            :create-project
+                            :create-client
+                            :can-create-project
+                            :currency
+                            :organization-billable-rate="organizationBillableRate"
+                            :projects="projects"
+                            :tasks="tasks"
+                            :enable-estimated-time="enableEstimatedTime" />
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <TagDropdown
+                            v-model="timeEntry.tags"
+                            :create-tag
+                            :tags="tags"
+                            :show-no-tag-option="false">
+                            <template #trigger>
+                                <Button variant="input">
+                                    <TagIcon class="h-4 text-icon-default" />
+                                    <span>{{
+                                        timeEntry.tags.length === 0
+                                            ? 'Tags'
+                                            : `${timeEntry.tags.length} Tag${timeEntry.tags.length > 1 ? 's' : ''}`
+                                    }}</span>
+                                </Button>
+                            </template>
+                        </TagDropdown>
+                        <Select v-model="billableProxy">
+                            <SelectTrigger :show-chevron="false">
+                                <SelectValue class="flex items-center gap-2">
+                                    <BillableIcon class="h-4 text-icon-default" />
+                                    <span>{{
+                                        timeEntry.billable ? 'Billable' : 'Non-Billable'
+                                    }}</span>
+                                </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="true" :disabled="billableRatesLocked"
+                                    >Billable</SelectItem
+                                >
+                                <SelectItem value="false">Non Billable</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
-                    <TagDropdown
-                        v-model="timeEntry.tags"
-                        :create-tag
-                        :tags="tags"
-                        :show-no-tag-option="false">
-                        <template #trigger>
-                            <Button variant="input">
-                                <TagIcon class="h-4 text-icon-default" />
-                                <span>{{
-                                    timeEntry.tags.length === 0
-                                        ? 'Tags'
-                                        : `${timeEntry.tags.length} Tag${timeEntry.tags.length > 1 ? 's' : ''}`
-                                }}</span>
-                            </Button>
-                        </template>
-                    </TagDropdown>
-                    <Select v-model="billableProxy">
-                        <SelectTrigger :show-chevron="false">
-                            <SelectValue class="flex items-center gap-2">
-                                <BillableIcon class="h-4 text-icon-default" />
-                                <span>{{ timeEntry.billable ? 'Billable' : 'Non-Billable' }}</span>
-                            </SelectValue>
+                <Field v-if="selectedTask && canUpdateTasks()" class="pt-4 sm:max-w-48">
+                    <FieldLabel>Task status</FieldLabel>
+                    <Select
+                        v-model="taskStatus"
+                        :disabled="saving || entryCreated"
+                        @update:model-value="taskStatusChanged = true">
+                        <SelectTrigger aria-label="Task status">
+                            <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="true" :disabled="billableRatesLocked"
-                                >Billable</SelectItem
-                            >
-                            <SelectItem value="false">Non Billable</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="done">Done</SelectItem>
                         </SelectContent>
                     </Select>
-                </div>
-            </div>
-            <TimeRangeFields
-                v-model:start="localStart"
-                v-model:end="localEnd"
-                show-hint
-                class="pt-4"></TimeRangeFields>
+                </Field>
+                <TimeRangeFields
+                    v-model:start="localStart"
+                    v-model:end="localEnd"
+                    show-hint
+                    class="pt-4"></TimeRangeFields>
+            </fieldset>
         </template>
         <template #footer>
-            <SecondaryButton tabindex="2" @click="show = false"> Cancel</SecondaryButton>
+            <SecondaryButton tabindex="2" :disabled="saving" @click="show = false">
+                Cancel</SecondaryButton
+            >
             <PrimaryButton
                 tabindex="2"
                 class="ms-3"
                 :class="{ 'opacity-25': saving }"
                 :disabled="saving"
                 @click="submit">
-                Create Time Entry
+                {{
+                    saving ? 'Saving...' : entryCreated ? 'Retry task status' : 'Create Time Entry'
+                }}
             </PrimaryButton>
         </template>
     </DialogModal>
