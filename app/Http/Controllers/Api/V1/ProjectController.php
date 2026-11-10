@@ -45,7 +45,8 @@ class ProjectController extends Controller
         $user = $this->user();
 
         $projectsQuery = Project::query()
-            ->whereBelongsTo($organization, 'organization');
+            ->whereBelongsTo($organization, 'organization')
+            ->with('tags');
 
         if (! $canViewAllProjects) {
             $projectsQuery->visibleByEmployee($user);
@@ -81,7 +82,7 @@ class ProjectController extends Controller
         // Note: There is currently no need to check if a user is a member of the project,
         // since this is only relevant for users with the role "employee" and they can not access this endpoint.
 
-        $project->load('organization');
+        $project->load('organization', 'tags');
 
         return new ProjectResource($project, true);
     }
@@ -108,9 +109,12 @@ class ProjectController extends Controller
             $project->estimated_time = $request->getEstimatedTime();
         }
         $project->organization()->associate($organization);
-        $project->save();
+        DB::transaction(function () use ($project, $request): void {
+            $project->save();
+            $project->tags()->attach($request->validated('tag_ids', []));
+        });
 
-        return new ProjectResource($project, true);
+        return new ProjectResource($project->load('tags'), true);
     }
 
     /**
@@ -148,7 +152,16 @@ class ProjectController extends Controller
             $project->client_id = $request->input('client_id');
             $clientIdChanged = true;
         }
-        $project->save();
+        DB::transaction(function () use ($project, $request): void {
+            if ($request->has('tag_ids')) {
+                // Serialize tag changes even when no project attributes changed.
+                Project::query()->whereKey($project->id)->lockForUpdate()->firstOrFail();
+            }
+            $project->save();
+            if ($request->has('tag_ids')) {
+                $project->tags()->sync($request->validated('tag_ids'));
+            }
+        });
 
         if ($oldBillableRate !== $project->billable_rate) {
             $billableRateService->updateTimeEntriesBillableRateForProject($project);
@@ -160,7 +173,7 @@ class ProjectController extends Controller
                 ->update(['client_id' => $project->client_id]);
         }
 
-        return new ProjectResource($project, true);
+        return new ProjectResource($project->load('tags'), true);
     }
 
     /**

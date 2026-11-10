@@ -2,7 +2,7 @@
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { CreateClientBody, CreateProjectBody, Project } from '@/packages/api/src';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import { useProjectsStore } from '@/utils/useProjects';
@@ -19,6 +19,7 @@ import { Field, FieldGroup, FieldLabel } from '@/packages/ui/src/field';
 import ProjectBillableRateModal from '@/packages/ui/src/Project/ProjectBillableRateModal.vue';
 import { getOrganizationCurrencyString } from '@/utils/money';
 import ProjectEditBillableSection from '@/packages/ui/src/Project/ProjectEditBillableSection.vue';
+import ProjectTagsField from '@/packages/ui/src/Project/ProjectTagsField.vue';
 import ProjectVisibilitySelect from '@/packages/ui/src/Project/ProjectVisibilitySelect.vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
@@ -46,6 +47,13 @@ const project = ref<CreateProjectBody>({
     is_billable: props.originalProject.is_billable,
     estimated_time: props.originalProject.estimated_time,
     is_public: props.originalProject.is_public,
+    tag_ids: [...(props.originalProject.tag_ids ?? [])],
+});
+
+watch(show, (isOpen) => {
+    if (isOpen) {
+        project.value.tag_ids = [...(props.originalProject.tag_ids ?? [])];
+    }
 });
 
 async function submit() {
@@ -118,6 +126,7 @@ async function submitBillableRate() {
                         </template>
                     </ClientDropdown>
                 </Field>
+                <ProjectTagsField v-model="project.tag_ids" />
                 <ProjectEditBillableSection
                     v-model:is-billable="project.is_billable"
                     v-model:billable-rate="project.billable_rate"

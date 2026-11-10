@@ -373,6 +373,7 @@ const ProjectResource = z
         estimated_time: z.union([z.number(), z.null()]),
         spent_time: z.number().int(),
         is_public: z.boolean(),
+        tag_ids: z.array(z.string()).optional(),
     })
     .passthrough();
 const ProjectStoreRequest = z
@@ -384,6 +385,7 @@ const ProjectStoreRequest = z
         client_id: z.union([z.string(), z.null()]).optional(),
         estimated_time: z.union([z.number(), z.null()]).optional(),
         is_public: z.boolean().optional(),
+        tag_ids: z.array(z.string()).optional(),
     })
     .passthrough();
 const ProjectUpdateRequest = z
@@ -396,6 +398,7 @@ const ProjectUpdateRequest = z
         client_id: z.union([z.string(), z.null()]).optional(),
         billable_rate: z.union([z.number(), z.null()]).optional(),
         estimated_time: z.union([z.number(), z.null()]).optional(),
+        tag_ids: z.array(z.string()).optional(),
     })
     .passthrough();
 const ProjectMemberResource = z

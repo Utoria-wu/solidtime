@@ -24,6 +24,7 @@ export const useTagsStore = defineStore('tags', () => {
                 'Failed to delete tag'
             );
             queryClient.invalidateQueries({ queryKey: ['tags'] });
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
         }
     }
 
