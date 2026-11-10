@@ -25,7 +25,7 @@ class ProjectResource extends BaseResource
     /**
      * Transform the resource into an array.
      *
-     * @return array<string, string|bool|int|null>
+     * @return array<string, string|bool|int|null|list<string>>
      */
     public function toArray(Request $request): array
     {
@@ -50,6 +50,8 @@ class ProjectResource extends BaseResource
             'spent_time' => $this->resource->spent_time,
             /** Whether the project is public */
             'is_public' => $this->resource->is_public,
+            /** @var list<string> IDs of tags attached to the project */
+            'tag_ids' => $this->resource->tags->map(fn ($tag): string => $tag->id)->values()->all(),
         ];
     }
 }

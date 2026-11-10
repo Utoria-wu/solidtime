@@ -21,11 +21,12 @@ const NO_TAG_LABEL = 'No Tag';
 const props = withDefaults(
     defineProps<{
         tags: Tag[];
-        createTag: (name: string) => Promise<Tag | undefined>;
+        createTag?: (name: string) => Promise<Tag | undefined>;
         align?: 'center' | 'end' | 'start';
         showNoTagOption?: boolean;
     }>(),
     {
+        createTag: undefined,
         align: 'start',
         showNoTagOption: true,
     }
@@ -78,7 +79,7 @@ function toggleTag(id: string) {
 }
 
 async function createAndAddTag(name: string) {
-    const newTag = await props.createTag(name);
+    const newTag = await props.createTag?.(name);
     if (newTag) {
         toggleTag(newTag.id);
     }
@@ -154,7 +155,7 @@ const showCreateTagModal = ref(false);
                         </ComboboxItem>
                     </ComboboxViewport>
                 </ComboboxContent>
-                <div class="mt-1 border-t border-card-background-separator pt-1">
+                <div v-if="createTag" class="mt-1 border-t border-card-background-separator pt-1">
                     <Button
                         variant="ghost"
                         size="sm"

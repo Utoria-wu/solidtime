@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useBillableRatesLock } from '@/packages/ui/src/utils/useBillableRatesLock';
+import TagBadge from '@/packages/ui/src/Tag/TagBadge.vue';
+import { useTagsQuery } from '@/utils/useTagsQuery';
 import ProjectMoreOptionsDropdown from '@/Components/Common/Project/ProjectMoreOptionsDropdown.vue';
 import type { Project } from '@/packages/api/src';
 import { computed, ref, inject, type ComputedRef } from 'vue';
@@ -34,12 +36,17 @@ import {
 } from '@/packages/ui/src';
 
 const { clients } = useClientsQuery();
+const { tags } = useTagsQuery();
 const { tasks } = useTasksQuery();
 
 const props = defineProps<{
     project: Project;
     showBillableRate: boolean;
 }>();
+
+const projectTags = computed(() =>
+    tags.value.filter((tag) => props.project.tag_ids?.includes(tag.id))
+);
 
 const client = computed(() => {
     return clients.value.find((client) => client.id === props.project.client_id);
@@ -98,10 +105,25 @@ const { locked: billableRatesLocked } = useBillableRatesLock();
                             backgroundColor: project.color,
                             boxShadow: `var(--tw-ring-inset) 0 0 0 calc(4px + var(--tw-ring-offset-width)) ${project.color}30`,
                         }"
-                        class="w-3 h-3 ml-1 rounded-full"></div>
-                    <span class="overflow-ellipsis overflow-hidden">
+                        class="w-3 h-3 ml-1 shrink-0 rounded-full"></div>
+                    <span class="truncate" :title="project.name">
                         {{ project.name }}
                     </span>
+                    <div v-if="projectTags.length" class="flex max-w-[45%] shrink-0 items-center gap-1">
+                        <TagBadge
+                            v-for="tag in projectTags.slice(0, 2)"
+                            :key="tag.id"
+                            :name="tag.name"
+                            :title="tag.name"
+                            :show-icon="false"
+                            class="max-w-24 px-1.5 py-0.5 text-text-secondary [&>span]:truncate" />
+                        <TagBadge
+                            v-if="projectTags.length > 2"
+                            :name="'+' + (projectTags.length - 2)"
+                            :title="projectTags.slice(2).map((tag) => tag.name).join(', ')"
+                            :show-icon="false"
+                            class="shrink-0 px-1.5 py-0.5 text-text-secondary" />
+                    </div>
                     <span class="text-text-secondary"> {{ projectTasksCount }} Tasks </span>
                 </div>
                 <div

@@ -8,6 +8,7 @@ use App\Http\Requests\V1\BaseFormRequest;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Project;
+use App\Models\Tag;
 use App\Rules\ColorRule;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Builder;
@@ -68,6 +69,16 @@ class ProjectStoreRequest extends BaseFormRequest
                 'nullable',
                 ExistsEloquent::make(Client::class, null, function (Builder $builder): Builder {
                     /** @var Builder<Client> $builder */
+                    return $builder->whereBelongsTo($this->organization, 'organization');
+                })->uuid(),
+            ],
+            // IDs of tags attached to the project.
+            'tag_ids' => ['sometimes', 'array', 'list'],
+            'tag_ids.*' => [
+                'required',
+                'distinct',
+                ExistsEloquent::make(Tag::class, null, function (Builder $builder): Builder {
+                    /** @var Builder<Tag> $builder */
                     return $builder->whereBelongsTo($this->organization, 'organization');
                 })->uuid(),
             ],

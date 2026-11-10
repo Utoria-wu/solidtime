@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -36,6 +37,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property Carbon|null $updated_at
  * @property-read Organization $organization
  * @property-read Client|null $client
+ * @property-read Collection<int, Tag> $tags
  * @property-read Collection<int, Task> $tasks
  * @property-read Collection<int, ProjectMember> $members
  *
@@ -158,6 +160,14 @@ class Project extends Model implements AuditableContract
     public function members(): HasMany
     {
         return $this->hasMany(ProjectMember::class, 'project_id');
+    }
+
+    /**
+     * @return BelongsToMany<Tag, $this>
+     */
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class)->orderBy('tags.name')->orderBy('tags.id');
     }
 
     /**
