@@ -123,7 +123,6 @@ async function createTag(tag: string): Promise<Tag | undefined> {
 
 async function createTimeEntry(timeEntry: Omit<CreateTimeEntryBody, 'member_id'>) {
     await createTimeEntryMutation(timeEntry);
-    showManualTimeEntryModal.value = false;
 }
 
 async function resumePreviousWorkAfterBreak() {
