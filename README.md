@@ -20,6 +20,16 @@ solidtime is a modern open-source time tracking application for Freelancers and 
  - Roles and permissions: Create and manage organizations
  - Import: Import your time tracking data from other time tracking applications (Supported: Toggl, Clockify, Timeentry CSV)
 
+## Project tags
+
+Assign multiple tags to a project when creating or editing it. The project list displays tags next to the project name so you can find related work across clients.
+
+Open **Filter projects → Tags** to choose one or more tags. Projects can match any selected tag, and the results also respect the other active filters and search. Choose **No tags** to find projects that have yet to be categorized.
+
+![Project list filtered by two tags and active status](docs/project-tags/project-tags-filter.png)
+
+![Selecting multiple tags in the project edit dialog](docs/project-tags/project-tags-edit.png)
+
 ## Self Hosting
 
 If you are looking into self-hosting solidtime, you can find the guides [here](https://docs.solidtime.io/self-hosting/intro)

@@ -21,27 +21,26 @@ import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { useStorage } from '@vueuse/core';
 import { useTableSortState } from '@/utils/useTableSortState';
-import ProjectsFilterDropdown from '@/Components/Common/Project/ProjectsFilterDropdown.vue';
+import ProjectsFilterDropdown, { type ProjectFilters } from '@/Components/Common/Project/ProjectsFilterDropdown.vue';
 import ProjectStatusFilterBadge from '@/Components/Common/Project/ProjectStatusFilterBadge.vue';
 import ProjectVisibilityFilterBadge from '@/Components/Common/Project/ProjectVisibilityFilterBadge.vue';
 import ProjectClientFilterBadge from '@/Components/Common/Project/ProjectClientFilterBadge.vue';
-import { NO_CLIENT_ID } from '@/Components/Common/Project/constants';
+import ProjectTagFilterBadge from '@/Components/Common/Project/ProjectTagFilterBadge.vue';
+import { useTagsQuery } from '@/utils/useTagsQuery';
+import { NO_CLIENT_ID, NO_TAG_ID } from '@/Components/Common/Project/constants';
 import type { SortColumn, SortDirection } from '@/Components/Common/Project/ProjectTable.vue';
 
 // Fetch data using TanStack Query
 const { projects, isLoading: projectsLoading } = useProjectsQuery();
 const { clients } = useClientsQuery();
+const { tags } = useTagsQuery();
 const { organization } = useOrganizationQuery(getCurrentOrganizationId()!);
 
 // Table state persisted in localStorage
 interface ProjectTableState {
     sortColumn: SortColumn;
     sortDirection: SortDirection;
-    filters: {
-        clientIds: string[];
-        status: 'active' | 'archived' | 'all';
-        visibility: 'public' | 'private' | 'all';
-    };
+    filters: ProjectFilters;
 }
 
 const { tableState, handleSort } = useTableSortState<SortColumn, ProjectTableState>(
@@ -51,6 +50,7 @@ const { tableState, handleSort } = useTableSortState<SortColumn, ProjectTableSta
         sortDirection: 'asc',
         filters: {
             clientIds: [],
+            tagIds: [],
             status: 'all',
             visibility: 'all',
         },
@@ -106,6 +106,14 @@ const filteredProjects = computed(() => {
             }
         }
 
+        const selectedTagIds = tableState.value.filters.tagIds;
+        if (selectedTagIds.length) {
+            const projectTagIds = project.tag_ids ?? [];
+            return projectTagIds.length
+                ? projectTagIds.some((id) => selectedTagIds.includes(id))
+                : selectedTagIds.includes(NO_TAG_ID);
+        }
+
         return true;
     });
 });
@@ -115,7 +123,8 @@ const hasActiveFilters = computed(() => {
         search.value.trim() !== '' ||
         tableState.value.filters.status !== 'all' ||
         tableState.value.filters.visibility !== 'all' ||
-        tableState.value.filters.clientIds.length > 0
+        tableState.value.filters.clientIds.length > 0 ||
+        tableState.value.filters.tagIds.length > 0
     );
 });
 
@@ -172,10 +181,11 @@ const showBillableRate = computed(() => {
                 @submit="createProject"></ProjectCreateModal>
         </MainContainer>
         <MainContainer>
-            <div class="flex items-center gap-2 py-1">
+            <div class="flex flex-wrap items-center gap-2 py-1">
                 <ProjectsFilterDropdown
                     :filters="tableState.filters"
                     :clients="clients"
+                    :tags="tags"
                     @update:filters="tableState.filters = $event" />
 
                 <!-- Active Filters -->
@@ -204,6 +214,12 @@ const showBillableRate = computed(() => {
                     :clients="clients"
                     @remove="removeClientFilter"
                     @update:value="tableState.filters.clientIds = $event as string[]" />
+
+                <ProjectTagFilterBadge
+                    v-if="tableState.filters.tagIds.length > 0"
+                    v-model="tableState.filters.tagIds"
+                    :tags="tags"
+                    @remove="tableState.filters.tagIds = []" />
 
                 <div class="relative">
                     <Search

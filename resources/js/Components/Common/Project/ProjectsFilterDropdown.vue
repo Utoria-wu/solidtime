@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { UserGroupIcon, CheckCircleIcon, GlobeAltIcon } from '@heroicons/vue/16/solid';
+import { UserGroupIcon, CheckCircleIcon, GlobeAltIcon, TagIcon } from '@heroicons/vue/16/solid';
 import ListFilterIcon from '@/packages/ui/src/Icons/ListFilterIcon.vue';
 import {
     DropdownMenu,
@@ -14,18 +14,21 @@ import {
     DropdownMenuSeparator,
 } from '@/packages/ui/src';
 import { Button } from '@/packages/ui/src';
-import type { Client } from '@/packages/api/src';
+import ProjectTagFilterItems from './ProjectTagFilterItems.vue';
+import type { Client, Tag } from '@/packages/api/src';
 import { NO_CLIENT_ID } from './constants';
 
 export interface ProjectFilters {
     status: 'active' | 'archived' | 'all';
     visibility: 'public' | 'private' | 'all';
     clientIds: string[];
+    tagIds: string[];
 }
 
 const props = defineProps<{
     filters: ProjectFilters;
     clients: Client[];
+    tags: Tag[];
 }>();
 
 const emit = defineEmits<{
@@ -154,6 +157,18 @@ function toggleNoClient() {
                         @select.prevent="toggleClient(client.id)">
                         {{ client.name }}
                     </DropdownMenuCheckboxItem>
+                </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSub>
+                <DropdownMenuSubTrigger class="gap-2">
+                    <TagIcon class="h-4 w-4 text-icon-default" />
+                    <span>Tags</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent class="max-h-[300px] max-w-64 overflow-y-auto">
+                    <ProjectTagFilterItems
+                        :tags="tags"
+                        :model-value="filters.tagIds"
+                        @update:model-value="emit('update:filters', { ...filters, tagIds: $event })" />
                 </DropdownMenuSubContent>
             </DropdownMenuSub>
         </DropdownMenuContent>

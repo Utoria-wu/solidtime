@@ -99,6 +99,13 @@
                                     },
                                     "color": {
                                         "type": "string"
+                                    },
+                                    "tag_ids": {
+                                        "type": "array",
+                                        "description": "IDs of tags attached to the project",
+                                        "items": {
+                                            "type": "string"
+                                        }
                                     }
                                 },
                                 "required": [
@@ -235,6 +242,13 @@
                                     },
                                     "color": {
                                         "type": "string"
+                                    },
+                                    "tag_ids": {
+                                        "type": "array",
+                                        "description": "IDs of tags attached to the project",
+                                        "items": {
+                                            "type": "string"
+                                        }
                                     }
                                 },
                                 "required": [
@@ -754,6 +768,13 @@
                             "null"
                         ],
                         "description": "ID of client"
+                    },
+                    "tag_ids": {
+                        "type": "array",
+                        "description": "IDs of tags attached to the project",
+                        "items": {
+                            "type": "string"
+                        }
                     }
                 },
                 "required": [
