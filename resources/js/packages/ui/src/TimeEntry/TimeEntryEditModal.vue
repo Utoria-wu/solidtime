@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TimeEntryNotesField from './TimeEntryNotesField.vue';
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
@@ -63,6 +64,7 @@ const description = ref<HTMLInputElement | null>(null);
 
 watch(show, (value) => {
     if (value) {
+        editableTimeEntry.value = props.timeEntry ? { ...props.timeEntry } : null;
         nextTick(() => {
             description.value?.focus();
         });
@@ -221,6 +223,7 @@ const typeProxy = computed({
                             id="description"
                             ref="description"
                             v-model="editableTimeEntry.description"
+                            autocomplete="off"
                             placeholder="What did you work on?"
                             type="text"
                             class="mt-1 block w-full"
@@ -348,6 +351,7 @@ const typeProxy = computed({
                         </div>
                     </Field>
                 </div>
+                <TimeEntryNotesField v-model="editableTimeEntry.markdown_notes" />
             </div>
         </template>
         <template #footer>

@@ -35,6 +35,8 @@ class TimeEntryResource extends BaseResource
             'duration' => (int) $this->resource->getDuration()?->totalSeconds,
             /** @var string|null $description Description of time entry */
             'description' => $this->resource->description,
+            /** Optional notes in Markdown */
+            'markdown_notes' => $this->resource->markdown_notes,
             /** ID of task */
             'task_id' => $this->resource->task_id,
             /** ID of project */

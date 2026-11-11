@@ -23,6 +23,9 @@ defineEmits<{
             @sort="$emit('sort', $event)">
             Task Name
         </SortableTableHeaderCell>
+        <SortableTableHeaderCell column="due_date" v-bind="props" @sort="$emit('sort', $event)">
+            Due date
+        </SortableTableHeaderCell>
         <SortableTableHeaderCell column="spent_time" v-bind="props" @sort="$emit('sort', $event)">
             Total Time
         </SortableTableHeaderCell>

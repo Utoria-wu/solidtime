@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TimeEntryNotesField from './TimeEntryNotesField.vue';
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
@@ -66,6 +67,7 @@ watch(show, (value) => {
 
 const timeEntryDefaultValues = {
     description: '',
+    markdown_notes: null as string | null,
     project_id: null,
     task_id: null,
     tags: [],
@@ -192,6 +194,7 @@ const billableProxy = computed({
                             v-model="timeEntry.description"
                             aria-label="Description"
                             placeholder="What did you work on?"
+                            autocomplete="off"
                             type="text"
                             class="mt-1 block w-full"
                             @keydown.enter="submit" />
@@ -269,6 +272,7 @@ const billableProxy = computed({
                     v-model:end="localEnd"
                     show-hint
                     class="pt-4"></TimeRangeFields>
+                <TimeEntryNotesField v-model="timeEntry.markdown_notes" class="pt-4" />
             </fieldset>
         </template>
         <template #footer>

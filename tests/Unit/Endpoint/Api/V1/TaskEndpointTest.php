@@ -400,6 +400,32 @@ class TaskEndpointTest extends ApiEndpointTestAbstract
         ]);
     }
 
+    public function test_task_dates_can_be_saved_preserved_and_cleared_together(): void
+    {
+        $data = $this->createUserWithPermission(['tasks:create:all', 'tasks:update:all']);
+        $project = Project::factory()->forOrganization($data->organization)->create();
+        Passport::actingAs($data->user);
+
+        $store = route('api.v1.tasks.store', [$data->organization->getKey()]);
+        $body = ['name' => 'Schedule demo', 'project_id' => $project->getKey()];
+        $dates = ['start_date' => '2026-11-11', 'due_date' => '2026-11-15'];
+        $this->postJson($store, $body + ['due_date' => '2026-11-15'])->assertUnprocessable()->assertJsonValidationErrors('start_date');
+
+        $response = $this->postJson($store, $body + $dates)->assertCreated()
+            ->assertJsonPath('data.start_date', $dates['start_date'])
+            ->assertJsonPath('data.due_date', $dates['due_date']);
+        $id = $response->json('data.id');
+        $update = route('api.v1.tasks.update', [$data->organization->getKey(), $id]);
+
+        $this->putJson($update, ['name' => 'Schedule demo', 'is_done' => true])->assertOk()
+            ->assertJsonPath('data.due_date', $dates['due_date']);
+        $this->putJson($update, ['name' => 'Schedule demo', 'start_date' => '2026-11-16', 'due_date' => '2026-11-15'])
+            ->assertUnprocessable()->assertJsonValidationErrors('due_date');
+        $this->putJson($update, ['name' => 'Schedule demo', 'start_date' => null, 'due_date' => null])
+            ->assertOk()->assertJsonPath('data.start_date', null)->assertJsonPath('data.due_date', null);
+        $this->assertDatabaseHas(Task::class, ['id' => $id, 'start_date' => null, 'due_date' => null]);
+    }
+
     public function test_store_endpoint_ignores_estimated_time_if_pro_features_are_disabled(): void
     {
         // Arrange

@@ -7,6 +7,7 @@ import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import { useFocus } from '@vueuse/core';
 import { useTasksStore } from '@/utils/useTasks';
 import ProjectDropdown from '@/Components/Common/Project/ProjectDropdown.vue';
+import TaskDatesField from './TaskDatesField.vue';
 import EstimatedTimeSection from '@/packages/ui/src/EstimatedTimeSection.vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { Field, FieldGroup, FieldLabel } from '@/packages/ui/src/field';
@@ -19,6 +20,14 @@ const show = defineModel('show', { default: false });
 const saving = ref(false);
 
 const taskName = ref('');
+const taskDates = ref<{ start_date: string | null; due_date: string | null }>({
+    start_date: null,
+    due_date: null,
+});
+
+watch(show, (open) => {
+    if (open) taskDates.value = { start_date: null, due_date: null };
+});
 const estimatedTime = ref<number | null>(null);
 
 const props = defineProps<{
@@ -37,6 +46,7 @@ watch(
 async function submit() {
     await createTask({
         name: taskName.value,
+        ...taskDates.value,
         project_id: taskProjectId.value,
         estimated_time: estimatedTime.value,
     });
@@ -69,7 +79,7 @@ useFocus(taskNameInput, { initialValue: true });
                         placeholder="Task Name"
                         class="block w-full"
                         required
-                        autocomplete="taskName"
+                        autocomplete="off"
                         @keydown.enter="submit()" />
                 </Field>
                 <Field class="w-auto">
@@ -88,10 +98,13 @@ useFocus(taskNameInput, { initialValue: true });
                         </template>
                     </ProjectDropdown>
                 </Field>
-                <EstimatedTimeSection
-                    v-if="isAllowedToPerformPremiumAction()"
-                    v-model="estimatedTime"
-                    @submit="submit()"></EstimatedTimeSection>
+                <div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+                    <TaskDatesField v-model="taskDates" />
+                    <EstimatedTimeSection
+                        v-if="isAllowedToPerformPremiumAction()"
+                        v-model="estimatedTime"
+                        @submit="submit()"></EstimatedTimeSection>
+                </div>
             </FieldGroup>
         </template>
         <template #footer>

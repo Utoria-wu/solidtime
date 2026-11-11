@@ -16,7 +16,7 @@ import {
     type SortDirection,
 } from '@/utils/useSortableTable';
 
-export type SortColumn = 'name' | 'spent_time' | 'progress';
+export type SortColumn = 'name' | 'due_date' | 'spent_time' | 'progress';
 export type { SortDirection } from '@/utils/useSortableTable';
 
 const props = defineProps<{
@@ -34,6 +34,10 @@ const columns: SortableColumnDef<Task, SortColumn>[] = [
     {
         id: 'name',
         accessorFn: (row: Task) => row.name.toLowerCase(),
+    },
+    {
+        id: 'due_date',
+        accessorFn: (row: Task) => row.due_date ?? undefined,
     },
     {
         id: 'spent_time',
@@ -83,7 +87,7 @@ const now = computed(() => Math.floor(timestamp.value / 1000));
                 class="grid min-w-full"
                 style="
                     grid-template-columns:
-                        minmax(10rem, 1fr) minmax(80px, auto) minmax(95px, auto) 8rem
+                        minmax(10rem, 1fr) 11rem minmax(80px, auto) minmax(95px, auto) 8rem
                         8rem;
                 ">
                 <TaskTableHeading
@@ -91,7 +95,7 @@ const now = computed(() => Math.floor(timestamp.value / 1000));
                     :sort-direction="sortDirection"
                     :desc-first-columns="descFirstColumns"
                     @sort="handleSort"></TaskTableHeading>
-                <div v-if="sortedTasks.length === 0" class="col-span-5 py-24 text-center">
+                <div v-if="sortedTasks.length === 0" class="col-span-full py-24 text-center">
                     <PlusCircleIcon class="w-8 text-icon-default inline pb-2"></PlusCircleIcon>
                     <h3 class="text-text-primary font-semibold">No tasks found</h3>
                     <p v-if="canCreateTasks()" class="pb-5">Create your first task now!</p>
