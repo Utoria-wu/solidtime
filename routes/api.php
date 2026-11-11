@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\V1\Public\ReportController as PublicReportControlle
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\TagController;
 use App\Http\Controllers\Api\V1\TaskController;
+use App\Http\Controllers\Api\V1\TaskTimerController;
 use App\Http\Controllers\Api\V1\TimeEntryController;
 use App\Http\Controllers\Api\V1\TimeZoneController;
 use App\Http\Controllers\Api\V1\UserController;
@@ -176,6 +177,8 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
 
         // Task routes
         Route::name('tasks.')->prefix('/organizations/{organization}')->group(static function (): void {
+            Route::get('/task-timers', [TaskTimerController::class, 'index'])->name('timers.index');
+            Route::post('/task-timers/{task}', [TaskTimerController::class, 'update'])->name('timers.update')->middleware('check-organization-blocked');
             Route::get('/tasks', [TaskController::class, 'index'])->name('index');
             Route::post('/tasks', [TaskController::class, 'store'])->name('store')->middleware('check-organization-blocked');
             Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('update')->middleware('check-organization-blocked');

@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { Task } from '@/packages/api/src';
-import { CheckCircleIcon } from '@heroicons/vue/20/solid';
+import { CheckIcon, PauseIcon, PlayIcon } from '@heroicons/vue/20/solid';
 import { useTasksStore } from '@/utils/useTasks';
 import TaskMoreOptionsDropdown from '@/Components/Common/Task/TaskMoreOptionsDropdown.vue';
 import TableRow from '@/Components/TableRow.vue';
-import { canDeleteTasks } from '@/utils/permissions';
+import { canDeleteTasks, canUpdateTasks } from '@/utils/permissions';
 import TaskEditModal from '@/Components/Common/Task/TaskEditModal.vue';
 import { computed, ref, inject, type ComputedRef } from 'vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
@@ -12,14 +12,66 @@ import EstimatedTimeProgress from '@/packages/ui/src/EstimatedTimeProgress.vue';
 import UpgradeBadge from '@/packages/ui/src/UpgradeBadge.vue';
 import {
     formatDate,
-    getLocalizedDayJs,
+    formatDuration,
     formatHumanReadableDuration,
+    getLocalizedDayJs,
 } from '../../../packages/ui/src/utils/time';
+import { elapsedTaskSeconds, type TaskTimer, type TaskTimerAction } from '@/utils/useTaskTimers';
 import type { Organization } from '@/packages/api/src';
+import DialogModal from '@/packages/ui/src/DialogModal.vue';
+import TextInput from '@/packages/ui/src/Input/TextInput.vue';
+import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
+import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
+import { Field, FieldLabel } from '@/packages/ui/src/field';
 
 const props = defineProps<{
     task: Task;
+    timer?: TaskTimer;
+    timerReady: boolean;
+    now: number;
+    change: (
+        taskId: string,
+        action: TaskTimerAction,
+        timer?: TaskTimer,
+        description?: string
+    ) => Promise<void>;
 }>();
+
+const saving = ref(false);
+const completionTimerId = ref<string | null>(null);
+const eventName = ref('');
+const eventNameId = computed(() => `calendar-event-name-${props.task.id}`);
+const canSaveCompletion = computed(
+    () =>
+        !saving.value &&
+        props.timer?.id === completionTimerId.value &&
+        eventName.value.trim().length > 0
+);
+
+function openCompletion() {
+    if (!props.timer || saving.value) return;
+    eventName.value = props.task.name;
+    completionTimerId.value = props.timer.id;
+}
+
+function submitCompletion() {
+    if (canSaveCompletion.value) {
+        void changeTimer('complete', eventName.value.trim());
+    }
+}
+
+async function changeTimer(action: TaskTimerAction, description?: string) {
+    if (saving.value) return;
+    saving.value = true;
+    try {
+        await props.change(props.task.id, action, props.timer, description);
+        if (action === 'complete') completionTimerId.value = null;
+    } catch {
+        // The API notification shows the error.
+    } finally {
+        saving.value = false;
+    }
+}
 
 const organization = inject<ComputedRef<Organization>>('organization');
 
@@ -34,6 +86,10 @@ function deleteTask() {
 }
 
 function markTaskAsDone() {
+    if (!props.task.is_done && props.timer) {
+        openCompletion();
+        return;
+    }
     useTasksStore().updateTask(props.task.id, {
         name: props.task.name,
         is_done: !props.task.is_done,
@@ -47,7 +103,7 @@ const showTaskEditModal = ref(false);
     <TableRow>
         <div
             class="whitespace-nowrap min-w-0 flex items-center space-x-5 3xl:pl-12 py-4 pr-3 text-sm font-medium text-text-primary pl-4 sm:pl-6 lg:pl-8 3xl:pl-12">
-            <span class="overflow-ellipsis overflow-hidden">
+            <span class="truncate" :title="task.name">
                 {{ task.name }}
             </span>
         </div>
@@ -89,16 +145,53 @@ const showTaskEditModal = ref(false);
         </div>
         <div
             class="whitespace-nowrap px-3 py-4 text-sm text-text-secondary flex space-x-1 items-center font-medium">
-            <template v-if="task.is_done">
-                <CheckCircleIcon class="w-5"></CheckCircleIcon>
-                <span>Done</span>
+            <template v-if="timer">
+                <span
+                    class="size-2 rounded-full"
+                    :class="timer.started_at === null ? 'bg-gray-400' : 'bg-teal-500'"
+                    :title="timer.started_at === null ? 'Paused' : 'Running'"></span>
+                <span class="tabular-nums">{{
+                    formatDuration(elapsedTaskSeconds(timer, now))
+                }}</span>
             </template>
-            <template v-else>
-                <span>Active</span>
-            </template>
+            <span v-else>--</span>
         </div>
-        <div
-            class="relative whitespace-nowrap flex items-center pl-3 text-right text-sm font-medium sm:pr-0 pr-4 sm:pr-6 lg:pr-8 3xl:pr-12">
+        <div class="relative whitespace-nowrap flex items-center gap-1 px-2 text-text-secondary">
+            <button
+                v-if="timerReady && (timer?.started_at || (!task.is_done && canUpdateTasks()))"
+                type="button"
+                class="inline-flex size-8 items-center justify-center rounded hover:text-text-primary disabled:opacity-50"
+                :disabled="saving"
+                :title="
+                    timer
+                        ? timer.started_at === null
+                            ? 'Resume timer'
+                            : 'Pause timer'
+                        : 'Start timer'
+                "
+                :aria-label="
+                    timer
+                        ? timer.started_at === null
+                            ? 'Resume timer'
+                            : 'Pause timer'
+                        : 'Start timer'
+                "
+                @click="
+                    changeTimer(timer ? (timer.started_at === null ? 'resume' : 'pause') : 'start')
+                ">
+                <PauseIcon v-if="timer?.started_at" class="size-4" />
+                <PlayIcon v-else class="size-4" />
+            </button>
+            <button
+                v-if="timer && canUpdateTasks()"
+                type="button"
+                class="inline-flex size-8 items-center justify-center rounded hover:text-text-primary disabled:opacity-50"
+                :disabled="saving"
+                title="Complete task and save to Calendar"
+                aria-label="Complete task and save to Calendar"
+                @click="openCompletion">
+                <CheckIcon class="size-4" />
+            </button>
             <TaskMoreOptionsDropdown
                 v-if="canDeleteTasks()"
                 :task="task"
@@ -107,6 +200,43 @@ const showTaskEditModal = ref(false);
                 @delete="deleteTask"></TaskMoreOptionsDropdown>
         </div>
         <TaskEditModal v-model:show="showTaskEditModal" :task="task"></TaskEditModal>
+        <DialogModal
+            :show="completionTimerId !== null"
+            :closeable="!saving"
+            max-width="lg"
+            @close="completionTimerId = null"
+            @submit="submitCompletion">
+            <template #title>Save to Calendar</template>
+            <template #content>
+                <Field>
+                    <FieldLabel :for="eventNameId">Event name</FieldLabel>
+                    <TextInput
+                        :id="eventNameId"
+                        v-model="eventName"
+                        type="text"
+                        class="w-full"
+                        :maxlength="5000"
+                        :disabled="saving"
+                        autofocus
+                        @keydown.enter.exact.prevent="!$event.isComposing && submitCompletion()" />
+                </Field>
+                <p v-if="timer?.id === completionTimerId" class="mt-3">
+                    Each timed segment will use this name. Saving also marks the task as Done.
+                </p>
+                <p v-else role="alert" class="mt-3">This timer is no longer available.</p>
+            </template>
+            <template #footer>
+                <SecondaryButton :disabled="saving" @click="completionTimerId = null">
+                    Cancel
+                </SecondaryButton>
+                <PrimaryButton
+                    class="ms-3"
+                    :disabled="!canSaveCompletion"
+                    @click="submitCompletion">
+                    {{ saving ? 'Saving…' : 'Save and complete' }}
+                </PrimaryButton>
+            </template>
+        </DialogModal>
     </TableRow>
 </template>
 
