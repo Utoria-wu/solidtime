@@ -28,6 +28,7 @@ const breaksEnabled = useBreaksEnabled();
 
 const props = defineProps<{
     row: TimesheetRow;
+    grouped?: boolean;
     weekDays: string[];
     todayDate: string;
     projects: Project[];
@@ -81,7 +82,8 @@ function hasRunningEntry(dayIndex: number): boolean {
     <div data-testid="timesheet_row" class="contents group">
         <!-- Project/Task column -->
         <div
-            class="flex items-center gap-1 border-t border-default-background-separator bg-default-background pl-4 pr-3 py-2 md:sticky md:left-0 md:z-10">
+            class="flex items-center gap-1 border-t border-default-background-separator bg-default-background pr-3 py-2 md:sticky md:left-0 md:z-10"
+            :class="grouped ? 'pl-10' : 'pl-4'">
             <div
                 v-if="row.type === 'break'"
                 class="flex flex-1 items-center gap-1.5 min-w-0 px-2 py-1 text-sm text-text-secondary">

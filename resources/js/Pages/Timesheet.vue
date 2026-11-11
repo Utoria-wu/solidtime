@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useBreaksEnabled } from '@/packages/ui/src/utils/useBreaksEnabled';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import LoadingSpinner from '@/packages/ui/src/LoadingSpinner.vue';
 import TimesheetHeader from '@/Components/Timesheet/TimesheetHeader.vue';
+import type { Dayjs } from 'dayjs';
+import TimesheetViewPicker, {
+    type TimesheetView,
+} from '@/Components/Timesheet/TimesheetViewPicker.vue';
+import TimesheetProjectHistory from '@/Components/Timesheet/TimesheetProjectHistory.vue';
 import TimesheetGrid from '@/Components/Timesheet/TimesheetGrid.vue';
 import TimesheetFooterActions from '@/Components/Timesheet/TimesheetFooterActions.vue';
 import RemoveRowDialog from '@/Components/Timesheet/RemoveRowDialog.vue';
@@ -50,6 +55,20 @@ const {
     goToNextWeek,
     goToCurrentWeek,
 } = useTimesheetWeek();
+
+const view = ref<TimesheetView>('days');
+const expandedProjects = ref(new Set<string | null>());
+
+function toggleProject(id: string | null) {
+    if (expandedProjects.value.has(id)) expandedProjects.value.delete(id);
+    else expandedProjects.value.add(id);
+}
+
+function openProjectWeek(start: Dayjs, id: string | null) {
+    weekStart.value = start;
+    expandedProjects.value.add(id);
+    view.value = 'days';
+}
 
 // ── Data fetching ─────────────────────────────────────────────────
 // The query fetches one padding day on each side of the week so that entries
@@ -186,6 +205,11 @@ const { isCopyingLastWeek, copyLastWeekRows, copyLastWeekWithTime } = useCopyLas
     breaksEnabled
 );
 
+async function copyWeek(copy: () => Promise<void>) {
+    await copy();
+    for (const row of rows.value) expandedProjects.value.add(row.projectId);
+}
+
 // ── Inline creation helpers (passed to TimesheetRow) ──────────────
 async function createProject(project: CreateProjectBody): Promise<Project | undefined> {
     return await useProjectsStore().createProject(project);
@@ -203,55 +227,81 @@ async function createTag(name: string): Promise<Tag | undefined> {
 <template>
     <AppLayout title="Timesheet" data-testid="timesheet_view">
         <div class="pt-5 lg:pt-8 pb-4 lg:pb-6">
-            <TimesheetHeader
-                :week-number="weekNumber"
-                :range-label="weekRangeLabel"
-                :week-total-formatted="weekTotalFormatted"
-                @previous="goToPreviousWeek"
-                @next="goToNextWeek"
-                @current="goToCurrentWeek" />
+            <template v-if="view === 'days'">
+                <TimesheetHeader
+                    :week-number="weekNumber"
+                    :range-label="weekRangeLabel"
+                    :week-total-formatted="weekTotalFormatted"
+                    @previous="goToPreviousWeek"
+                    @next="goToNextWeek"
+                    @current="goToCurrentWeek">
+                    <TimesheetViewPicker v-model="view" />
+                </TimesheetHeader>
 
-            <TimesheetGrid
-                v-if="!isPending"
-                :rows="rows"
-                :week-days="weekDays"
+                <TimesheetGrid
+                    v-if="!isPending"
+                    :rows="rows"
+                    :expanded-projects="expandedProjects"
+                    :week-days="weekDays"
+                    :today-date="todayDate"
+                    :day-totals="dayTotals"
+                    :week-total-formatted="weekTotalFormatted"
+                    :break-day-totals="breakDayTotals"
+                    :break-grand-total="breakGrandTotal"
+                    :projects="projects"
+                    :tasks="tasks"
+                    :clients="clients"
+                    :tags="tags"
+                    :currency="getOrganizationCurrencyString()"
+                    :can-create-project="canCreateProjects()"
+                    :enable-estimated-time="isAllowedToPerformPremiumAction()"
+                    :create-project="createProject"
+                    :create-client="createClient"
+                    :create-tag="createTag"
+                    :format-duration="formatDuration"
+                    :cell-statuses="cellStatus"
+                    :cell-pending-seconds="cellPendingSeconds"
+                    :misplaced-break-dates="misplacedBreakDates"
+                    @toggle-project="toggleProject"
+                    @remove-row="handleRemoveRow"
+                    @cell-update="handleCellUpdate"
+                    @project-task-change="
+                        (row, projectId, taskId) => {
+                            expandedProjects.add(projectId);
+                            handleRowIdentityChange(row, { projectId, taskId });
+                        }
+                    "
+                    @billable-change="(row, billable) => handleRowIdentityChange(row, { billable })"
+                    @tags-change="(row, tags) => handleRowIdentityChange(row, { tags })"
+                    @add-row="
+                        (projectId, taskId) => {
+                            expandedProjects.add(projectId);
+                            handleAddRow(projectId, taskId);
+                        }
+                    " />
+
+                <TimesheetFooterActions
+                    v-if="!isPending"
+                    :busy="isCopyingLastWeek"
+                    @copy-rows="copyWeek(copyLastWeekRows)"
+                    @copy-with-time="copyWeek(copyLastWeekWithTime)" />
+
+                <div v-else class="flex justify-center items-center py-12">
+                    <LoadingSpinner />
+                </div>
+            </template>
+            <TimesheetProjectHistory
+                v-else
+                :view="view"
+                :week-start="weekStart"
                 :today-date="todayDate"
-                :day-totals="dayTotals"
-                :week-total-formatted="weekTotalFormatted"
-                :break-day-totals="breakDayTotals"
-                :break-grand-total="breakGrandTotal"
                 :projects="projects"
-                :tasks="tasks"
-                :clients="clients"
-                :tags="tags"
-                :currency="getOrganizationCurrencyString()"
-                :can-create-project="canCreateProjects()"
-                :enable-estimated-time="isAllowedToPerformPremiumAction()"
-                :create-project="createProject"
-                :create-client="createClient"
-                :create-tag="createTag"
                 :format-duration="formatDuration"
-                :cell-statuses="cellStatus"
-                :cell-pending-seconds="cellPendingSeconds"
-                :misplaced-break-dates="misplacedBreakDates"
-                @remove-row="handleRemoveRow"
-                @cell-update="handleCellUpdate"
-                @project-task-change="
-                    (row, projectId, taskId) => handleRowIdentityChange(row, { projectId, taskId })
-                "
-                @billable-change="(row, billable) => handleRowIdentityChange(row, { billable })"
-                @tags-change="(row, tags) => handleRowIdentityChange(row, { tags })"
-                @add-row="handleAddRow" />
-
-            <TimesheetFooterActions
-                v-if="!isPending"
-                :busy="isCopyingLastWeek"
-                @copy-rows="copyLastWeekRows"
-                @copy-with-time="copyLastWeekWithTime" />
-
-            <div v-else class="flex justify-center items-center py-12">
-                <LoadingSpinner />
-            </div>
+                :now="currentTimerNow ?? undefined"
+                @week="openProjectWeek"
+                @month="view = 'weeks'">
+                <TimesheetViewPicker v-model="view" />
+            </TimesheetProjectHistory>
         </div>
 
         <RemoveRowDialog

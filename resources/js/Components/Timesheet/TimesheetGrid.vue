@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { inject, type ComputedRef } from 'vue';
+import { computed, inject, type ComputedRef } from 'vue';
 import { Button } from '@/packages/ui/src/Buttons';
-import { PlusIcon } from '@heroicons/vue/20/solid';
+import { ChevronRightIcon, PlusIcon } from '@heroicons/vue/20/solid';
 import { ExclamationTriangleIcon, ArrowRightIcon } from '@heroicons/vue/16/solid';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/packages/ui/src';
 import { Link } from '@inertiajs/vue3';
@@ -23,8 +23,9 @@ import type { CellSaveStatus } from '@/utils/timesheet/useTimesheetCellMutations
 const organization = inject<ComputedRef<Organization>>('organization');
 const dayjs = getDayJsInstance();
 
-defineProps<{
+const props = defineProps<{
     rows: TimesheetRowType[];
+    expandedProjects: Set<string | null>;
     weekDays: string[];
     todayDate: string;
     dayTotals: number[];
@@ -48,6 +49,7 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
+    (e: 'toggle-project', id: string | null): void;
     (e: 'remove-row', key: TimesheetRowKey): void;
     (e: 'cell-update', row: TimesheetRowType, dayIndex: number, seconds: number): void;
     (
@@ -60,6 +62,35 @@ const emit = defineEmits<{
     (e: 'tags-change', row: TimesheetRowType, tags: string[]): void;
     (e: 'add-row', projectId: string | null, taskId: string | null): void;
 }>();
+const groups = computed(() => {
+    const byProject = new Map<string | null, TimesheetRowType[]>();
+    for (const row of props.rows) {
+        if (row.type === 'break') continue;
+        const rows = byProject.get(row.projectId) ?? [];
+        rows.push(row);
+        byProject.set(row.projectId, rows);
+    }
+    return Array.from(byProject, ([id, rows]) => ({
+        id,
+        project: props.projects.find((project) => project.id === id),
+        rows,
+        daily: props.weekDays.map((_, index) =>
+            rows.reduce((sum, row) => sum + (row.cells.get(index)?.totalSeconds ?? 0), 0)
+        ),
+        total: rows.reduce((sum, row) => sum + row.totalSeconds, 0),
+    }));
+});
+const displayRows = computed(() => [
+    ...groups.value.flatMap((group) => [
+        { key: 'project:' + (group.id ?? 'none'), group, row: null },
+        ...(props.expandedProjects.has(group.id)
+            ? group.rows.map((row) => ({ key: row.key, group: null, row }))
+            : []),
+    ]),
+    ...props.rows
+        .filter((row) => row.type === 'break')
+        .map((row) => ({ key: row.key, group: null, row })),
+]);
 </script>
 
 <template>
@@ -117,32 +148,69 @@ const emit = defineEmits<{
                 <div class="bg-background dark:bg-secondary"></div>
 
                 <!-- Data rows (break row is pinned last) -->
-                <TimesheetRow
-                    v-for="row in rows"
-                    :key="row.key"
-                    :row="row"
-                    :week-days="weekDays"
-                    :today-date="todayDate"
-                    :projects="projects"
-                    :tasks="tasks"
-                    :clients="clients"
-                    :tags="tags"
-                    :currency="currency"
-                    :can-create-project="canCreateProject"
-                    :enable-estimated-time="enableEstimatedTime"
-                    :create-project="createProject"
-                    :create-client="createClient"
-                    :create-tag="createTag"
-                    :format-duration="formatDuration"
-                    :cell-statuses="cellStatuses"
-                    :cell-pending-seconds="cellPendingSeconds"
-                    @remove-row="$emit('remove-row', $event)"
-                    @cell-update="
-                        (dayIndex, seconds) => $emit('cell-update', row, dayIndex, seconds)
-                    "
-                    @project-task-change="(pId, tId) => $emit('project-task-change', row, pId, tId)"
-                    @billable-change="(billable) => $emit('billable-change', row, billable)"
-                    @tags-change="(t) => $emit('tags-change', row, t)" />
+                <template v-for="{ key, group, row } in displayRows" :key="key">
+                    <template v-if="group">
+                        <div
+                            class="bg-background border-t border-default-background-separator px-4 py-2 md:sticky md:left-0 md:z-10">
+                            <button
+                                type="button"
+                                class="flex w-full items-center gap-2 rounded text-left text-sm font-semibold"
+                                :aria-expanded="expandedProjects.has(group.id)"
+                                @click="emit('toggle-project', group.id)">
+                                <ChevronRightIcon
+                                    class="size-4 shrink-0 text-text-secondary"
+                                    :class="{ 'rotate-90': expandedProjects.has(group.id) }" />
+                                <span
+                                    v-if="group.project"
+                                    class="size-2.5 shrink-0 rounded-full"
+                                    :style="{ backgroundColor: group.project.color }" />
+                                {{
+                                    group.project?.name ??
+                                    (group.id === null ? 'No project' : 'Unknown project')
+                                }}
+                            </button>
+                        </div>
+                        <div
+                            v-for="(seconds, index) in group.daily"
+                            :key="index"
+                            class="bg-background border-t border-default-background-separator px-2 py-2 text-center text-sm tabular-nums">
+                            {{ formatDuration(seconds) }}
+                        </div>
+                        <div
+                            class="bg-background border-t border-default-background-separator px-3 py-2 text-right text-sm font-semibold tabular-nums">
+                            {{ formatDuration(group.total) }}
+                        </div>
+                        <div class="bg-background border-t border-default-background-separator" />
+                    </template>
+                    <TimesheetRow
+                        v-else-if="row"
+                        :row="row"
+                        :grouped="row.type !== 'break'"
+                        :week-days="weekDays"
+                        :today-date="todayDate"
+                        :projects="projects"
+                        :tasks="tasks"
+                        :clients="clients"
+                        :tags="tags"
+                        :currency="currency"
+                        :can-create-project="canCreateProject"
+                        :enable-estimated-time="enableEstimatedTime"
+                        :create-project="createProject"
+                        :create-client="createClient"
+                        :create-tag="createTag"
+                        :format-duration="formatDuration"
+                        :cell-statuses="cellStatuses"
+                        :cell-pending-seconds="cellPendingSeconds"
+                        @remove-row="$emit('remove-row', $event)"
+                        @cell-update="
+                            (dayIndex, seconds) => $emit('cell-update', row, dayIndex, seconds)
+                        "
+                        @project-task-change="
+                            (pId, tId) => $emit('project-task-change', row, pId, tId)
+                        "
+                        @billable-change="(billable) => $emit('billable-change', row, billable)"
+                        @tags-change="(t) => $emit('tags-change', row, t)" />
+                </template>
 
                 <!-- Add row -->
                 <div

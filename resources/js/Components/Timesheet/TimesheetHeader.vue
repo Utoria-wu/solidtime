@@ -17,16 +17,19 @@ defineEmits<{
 <template>
     <div class="flex flex-wrap items-center justify-between gap-4 mb-4 px-2 sm:px-4 lg:px-6">
         <!-- Left: Week navigation -->
-        <DateRangeNavigator
-            :label="rangeLabel"
-            :secondary-label="`W${weekNumber}`"
-            previous-test-id="timesheet_prev_week"
-            trigger-test-id="timesheet_week_display"
-            next-test-id="timesheet_next_week"
-            trigger-aria-label="Return to current week"
-            @previous="$emit('previous')"
-            @next="$emit('next')"
-            @select="$emit('current')" />
+        <div class="flex flex-wrap items-center gap-3">
+            <DateRangeNavigator
+                :label="rangeLabel"
+                :secondary-label="`W${weekNumber}`"
+                previous-test-id="timesheet_prev_week"
+                trigger-test-id="timesheet_week_display"
+                next-test-id="timesheet_next_week"
+                trigger-aria-label="Return to current week"
+                @previous="$emit('previous')"
+                @next="$emit('next')"
+                @select="$emit('current')" />
+            <slot />
+        </div>
 
         <!-- Right: Week total -->
         <div class="flex items-center gap-2.5">
