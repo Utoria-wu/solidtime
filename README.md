@@ -6,7 +6,7 @@ When a project has several tasks, billable settings, or tags, its hours can be s
 
 - **Days** shows a collapsible row for each project with daily hours and a weekly total. Expand a project to edit the existing task, billing, and tag rows.
 - **Weeks** shows 12 weeks of actual hours by project. **Months** shows 12 rolling months, and **Year** shows January through December of the selected year.
-- Colored cells show periods with tracked work. Gray cells show gaps. Select a month to see its weeks, then select a week to open the daily Timesheet with the project expanded.
+- The timeline takes inspiration from the [DeepSeek status page](https://status.deepseek.com/). Project-colored cells show periods with tracked work, and gray cells show periods with no recorded time. Select a month to see its weeks, then select a week to open the daily Timesheet with the project expanded.
 
 ![Weekly project totals showing periods of work and gaps](.github/feature-images/timesheet-history-weeks.png)
 
