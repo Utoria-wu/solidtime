@@ -22,6 +22,12 @@ The task name and manual time entry description fields also opt out of browser f
 
 ![Previewing the Markdown checklist in the Calendar dialog](.github/feature-images/feature-calendar-notes-preview.png)
 
+## Notes when completing a project task
+
+In a project, start a task timer and open **Save to Calendar** to complete the task. Add optional Markdown notes and use **Preview** to check the result. Each time entry saved from the timer carries the same event name and notes. Open an entry in Calendar to edit its notes.
+
+![Previewing Markdown notes before saving a completed task to Calendar](.github/feature-images/project-completion-notes.png)
+
 ## Verification
 
 The screenshots use a local demo with sample data. Browser testing covered creating a task date range, reopening it after reload, clearing it, and creating and editing a Calendar note. API tests cover invalid task ranges, preserving dates on status-only updates, and preserving and clearing Markdown independently of the event title.
