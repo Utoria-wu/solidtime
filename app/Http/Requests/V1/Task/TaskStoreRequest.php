@@ -48,6 +48,9 @@ class TaskStoreRequest extends BaseFormRequest
                     return $builder->whereBelongsTo($this->organization, 'organization');
                 })->uuid(),
             ],
+            // Both dates must be sent together. Send both as null to clear them.
+            'start_date' => ['present_with:due_date', 'required_with:due_date', 'nullable', 'date_format:Y-m-d'],
+            'due_date' => ['present_with:start_date', 'required_with:start_date', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             // Estimated time in seconds
             'estimated_time' => [
                 'nullable',

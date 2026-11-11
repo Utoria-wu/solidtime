@@ -2636,6 +2636,29 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         ]);
     }
 
+    public function test_time_entry_markdown_is_saved_separately_and_can_be_cleared(): void
+    {
+        $data = $this->createUserWithPermission(['time-entries:create:own', 'time-entries:update:own']);
+        Passport::actingAs($data->user);
+        $notes = "    code example\n\n- [ ] Confirm the result";
+
+        $response = $this->postJson(route('api.v1.time-entries.store', [$data->organization->getKey()]), [
+            'member_id' => $data->member->getKey(),
+            'start' => '2026-11-11T09:00:00Z',
+            'end' => '2026-11-11T09:30:00Z',
+            'billable' => false,
+            'description' => 'Review checklist',
+            'markdown_notes' => $notes,
+        ])->assertCreated()->assertJsonPath('data.markdown_notes', $notes);
+        $id = $response->json('data.id');
+        $update = route('api.v1.time-entries.update', [$data->organization->getKey(), $id]);
+
+        $this->putJson($update, ['description' => 'Updated title'])->assertOk()
+            ->assertJsonPath('data.description', 'Updated title')->assertJsonPath('data.markdown_notes', $notes);
+        $this->putJson($update, ['markdown_notes' => null])->assertOk()->assertJsonPath('data.markdown_notes', null);
+        $this->assertDatabaseHas(TimeEntry::class, ['id' => $id, 'markdown_notes' => null]);
+    }
+
     public function test_store_endpoint_fails_gracefully_if_non_uuid_text_is_in_uuid_validated_field_in_body(): void
     {
         // Arrange

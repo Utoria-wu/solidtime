@@ -25,6 +25,7 @@ use Staudenmeir\EloquentJsonRelations\Relations\BelongsToJson;
 /**
  * @property string $id
  * @property string $description
+ * @property string|null $markdown_notes
  * @property Carbon $start
  * @property Carbon|null $end
  * @property int|null $billable_rate Billable rate per hour in cents
@@ -90,6 +91,7 @@ class TimeEntry extends Model implements AuditableContract
     public const array SELECT_COLUMNS = [
         'id',
         'description',
+        'markdown_notes',
         'start',
         'end',
         'billable_rate',

@@ -30,6 +30,10 @@ class TaskResource extends BaseResource
             'is_done' => $this->resource->is_done,
             /** ID of the project */
             'project_id' => $this->resource->project_id,
+            /** First day of the planned task range (YYYY-MM-DD) */
+            'start_date' => $this->resource->start_date?->toDateString(),
+            /** Last day of the planned task range (YYYY-MM-DD) */
+            'due_date' => $this->resource->due_date?->toDateString(),
             /** Estimated time in seconds */
             'estimated_time' => $this->resource->estimated_time,
             /** Spent time on this task in seconds (sum of the duration of all associated time entries, excl. still running time entries) */

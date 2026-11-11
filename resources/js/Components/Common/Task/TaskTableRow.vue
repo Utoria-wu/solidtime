@@ -6,11 +6,15 @@ import TaskMoreOptionsDropdown from '@/Components/Common/Task/TaskMoreOptionsDro
 import TableRow from '@/Components/TableRow.vue';
 import { canDeleteTasks } from '@/utils/permissions';
 import TaskEditModal from '@/Components/Common/Task/TaskEditModal.vue';
-import { ref, inject, type ComputedRef } from 'vue';
+import { computed, ref, inject, type ComputedRef } from 'vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import EstimatedTimeProgress from '@/packages/ui/src/EstimatedTimeProgress.vue';
 import UpgradeBadge from '@/packages/ui/src/UpgradeBadge.vue';
-import { formatHumanReadableDuration } from '../../../packages/ui/src/utils/time';
+import {
+    formatDate,
+    getLocalizedDayJs,
+    formatHumanReadableDuration,
+} from '../../../packages/ui/src/utils/time';
 import type { Organization } from '@/packages/api/src';
 
 const props = defineProps<{
@@ -19,13 +23,19 @@ const props = defineProps<{
 
 const organization = inject<ComputedRef<Organization>>('organization');
 
+const today = computed(() => getLocalizedDayJs().format('YYYY-MM-DD'));
+const overdue = computed(
+    () => !!props.task.due_date && !props.task.is_done && props.task.due_date < today.value
+);
+const dueToday = computed(() => props.task.due_date === today.value && !props.task.is_done);
+
 function deleteTask() {
     useTasksStore().deleteTask(props.task.id);
 }
 
 function markTaskAsDone() {
     useTasksStore().updateTask(props.task.id, {
-        ...props.task,
+        name: props.task.name,
         is_done: !props.task.is_done,
     });
 }
@@ -40,6 +50,19 @@ const showTaskEditModal = ref(false);
             <span class="overflow-ellipsis overflow-hidden">
                 {{ task.name }}
             </span>
+        </div>
+        <div
+            class="whitespace-nowrap px-3 py-4 flex items-center gap-1.5 text-sm"
+            :class="
+                overdue ? 'text-red-500' : dueToday ? 'text-accent-500' : 'text-text-secondary'
+            ">
+            <template v-if="task.due_date">
+                <span>{{
+                    dueToday ? 'Today' : formatDate(task.due_date, organization?.date_format)
+                }}</span>
+                <span v-if="overdue" class="text-xs">· Overdue</span>
+            </template>
+            <span v-else class="text-text-tertiary">—</span>
         </div>
         <div
             class="whitespace-nowrap px-3 py-4 text-sm text-text-secondary flex space-x-1 items-center font-medium">

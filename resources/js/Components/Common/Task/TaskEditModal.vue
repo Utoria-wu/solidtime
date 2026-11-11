@@ -2,11 +2,12 @@
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import { useFocus } from '@vueuse/core';
 import { useTasksStore } from '@/utils/useTasks';
 import type { Task, UpdateTaskBody } from '@/packages/api/src';
+import TaskDatesField from './TaskDatesField.vue';
 import EstimatedTimeSection from '@/packages/ui/src/EstimatedTimeSection.vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { Field, FieldGroup, FieldLabel } from '@/packages/ui/src/field';
@@ -24,8 +25,22 @@ const taskBody = ref<UpdateTaskBody>({
     estimated_time: props.task.estimated_time,
 });
 
+const taskDates = ref({
+    start_date: props.task.start_date ?? null,
+    due_date: props.task.due_date ?? null,
+});
+
+watch(show, (open) => {
+    if (!open) return;
+    taskBody.value = { name: props.task.name, estimated_time: props.task.estimated_time };
+    taskDates.value = {
+        start_date: props.task.start_date ?? null,
+        due_date: props.task.due_date ?? null,
+    };
+});
+
 async function submit() {
-    await updateTask(props.task.id, taskBody.value);
+    await updateTask(props.task.id, { ...taskBody.value, ...taskDates.value });
     show.value = false;
 }
 
@@ -54,13 +69,16 @@ useFocus(taskNameInput, { initialValue: true });
                         placeholder="Task Name"
                         class="block w-full"
                         required
-                        autocomplete="taskName"
+                        autocomplete="off"
                         @keydown.enter="submit()" />
                 </Field>
-                <EstimatedTimeSection
-                    v-if="isAllowedToPerformPremiumAction()"
-                    v-model="taskBody.estimated_time"
-                    @submit="submit()"></EstimatedTimeSection>
+                <div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+                    <TaskDatesField v-model="taskDates" />
+                    <EstimatedTimeSection
+                        v-if="isAllowedToPerformPremiumAction()"
+                        v-model="taskBody.estimated_time"
+                        @submit="submit()"></EstimatedTimeSection>
+                </div>
             </FieldGroup>
         </template>
         <template #footer>

@@ -707,6 +707,8 @@ const TaskResource = z
         name: z.string(),
         is_done: z.boolean(),
         project_id: z.string(),
+        start_date: z.union([z.string(), z.null()]).optional(),
+        due_date: z.union([z.string(), z.null()]).optional(),
         estimated_time: z.union([z.number(), z.null()]),
         spent_time: z.number().int(),
         created_at: z.string(),
@@ -717,6 +719,8 @@ const TaskStoreRequest = z
     .object({
         name: z.string().min(1).max(255),
         project_id: z.string(),
+        start_date: z.union([z.string(), z.null()]).optional(),
+        due_date: z.union([z.string(), z.null()]).optional(),
         estimated_time: z.union([z.number(), z.null()]).optional(),
     })
     .passthrough();
@@ -724,6 +728,8 @@ const TaskUpdateRequest = z
     .object({
         name: z.string().min(1).max(255),
         is_done: z.boolean().optional(),
+        start_date: z.union([z.string(), z.null()]).optional(),
+        due_date: z.union([z.string(), z.null()]).optional(),
         estimated_time: z.union([z.number(), z.null()]).optional(),
     })
     .passthrough();
@@ -736,6 +742,7 @@ const TimeEntryResource = z
         start: z.string(),
         end: z.union([z.string(), z.null()]),
         duration: z.union([z.number(), z.null()]),
+        markdown_notes: z.union([z.string(), z.null()]).optional(),
         description: z.union([z.string(), z.null()]),
         task_id: z.union([z.string(), z.null()]),
         project_id: z.union([z.string(), z.null()]),
@@ -755,6 +762,7 @@ const TimeEntryStoreRequest = z
         end: z.union([z.string(), z.null()]).optional(),
         billable: z.boolean(),
         type: TimeEntryType.optional(),
+        markdown_notes: z.union([z.string().max(10000), z.null()]).optional(),
         description: z.union([z.string(), z.null()]).optional(),
         tags: z.union([z.array(z.string()), z.null()]).optional(),
     })
@@ -785,6 +793,7 @@ const TimeEntryUpdateRequest = z
         end: z.union([z.string(), z.null()]),
         billable: z.boolean(),
         type: TimeEntryType,
+        markdown_notes: z.union([z.string().max(10000), z.null()]),
         description: z.union([z.string(), z.null()]),
         tags: z.union([z.array(z.string()), z.null()]),
     })

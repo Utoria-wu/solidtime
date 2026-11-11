@@ -104,6 +104,8 @@ class TimeEntryStoreRequest extends BaseFormRequest
                 'string',
                 'max:5000',
             ],
+            // Optional Markdown notes for this time entry
+            'markdown_notes' => ['nullable', 'string', 'max:10000'],
             // List of tag IDs
             'tags' => [
                 'nullable',
