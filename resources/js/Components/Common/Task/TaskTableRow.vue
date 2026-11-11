@@ -16,10 +16,16 @@ import {
     formatHumanReadableDuration,
     getLocalizedDayJs,
 } from '../../../packages/ui/src/utils/time';
-import { elapsedTaskSeconds, type TaskTimer, type TaskTimerAction } from '@/utils/useTaskTimers';
+import {
+    elapsedTaskSeconds,
+    type TaskTimer,
+    type TaskTimerAction,
+    type TaskTimerCompletion,
+} from '@/utils/useTaskTimers';
 import type { Organization } from '@/packages/api/src';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
+import TimeEntryNotesField from '@/packages/ui/src/TimeEntry/TimeEntryNotesField.vue';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import { Field, FieldLabel } from '@/packages/ui/src/field';
@@ -33,13 +39,14 @@ const props = defineProps<{
         taskId: string,
         action: TaskTimerAction,
         timer?: TaskTimer,
-        description?: string
+        completion?: TaskTimerCompletion
     ) => Promise<void>;
 }>();
 
 const saving = ref(false);
 const completionTimerId = ref<string | null>(null);
 const eventName = ref('');
+const notes = ref<string | null>(null);
 const eventNameId = computed(() => `calendar-event-name-${props.task.id}`);
 const canSaveCompletion = computed(
     () =>
@@ -51,20 +58,24 @@ const canSaveCompletion = computed(
 function openCompletion() {
     if (!props.timer || saving.value) return;
     eventName.value = props.task.name;
+    notes.value = null;
     completionTimerId.value = props.timer.id;
 }
 
 function submitCompletion() {
     if (canSaveCompletion.value) {
-        void changeTimer('complete', eventName.value.trim());
+        void changeTimer('complete', {
+            description: eventName.value.trim(),
+            markdown_notes: notes.value?.trim() ? notes.value : null,
+        });
     }
 }
 
-async function changeTimer(action: TaskTimerAction, description?: string) {
+async function changeTimer(action: TaskTimerAction, completion?: TaskTimerCompletion) {
     if (saving.value) return;
     saving.value = true;
     try {
-        await props.change(props.task.id, action, props.timer, description);
+        await props.change(props.task.id, action, props.timer, completion);
         if (action === 'complete') completionTimerId.value = null;
     } catch {
         // The API notification shows the error.
@@ -215,14 +226,21 @@ const showTaskEditModal = ref(false);
                         v-model="eventName"
                         type="text"
                         class="w-full"
+                        autocomplete="off"
                         :maxlength="5000"
                         :disabled="saving"
                         autofocus
                         @keydown.enter.exact.prevent="!$event.isComposing && submitCompletion()" />
                 </Field>
-                <p v-if="timer?.id === completionTimerId" class="mt-3">
-                    Each timed segment will use this name. Saving also marks the task as Done.
-                </p>
+                <template v-if="timer?.id === completionTimerId">
+                    <fieldset :disabled="saving" class="mt-4">
+                        <TimeEntryNotesField v-model="notes" />
+                    </fieldset>
+                    <p class="mt-3">
+                        Each timed segment will use this event name and notes. Saving also marks the
+                        task as Done.
+                    </p>
+                </template>
                 <p v-else role="alert" class="mt-3">This timer is no longer available.</p>
             </template>
             <template #footer>

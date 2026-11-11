@@ -43,6 +43,7 @@ class TaskTimerEndpointTest extends ApiEndpointTestAbstract
             'session_id' => $firstId,
             'version' => 2,
             'description' => 'Review calendar entries',
+            'markdown_notes' => "    Timing details\n\n- [x] Verify both segments",
         ];
         Queue::fake([RecalculateSpentTimeForTask::class]);
         $this->postJson($firstUrl, $body)->assertOk()->assertJsonPath('saved_entries', 2);
@@ -56,6 +57,7 @@ class TaskTimerEndpointTest extends ApiEndpointTestAbstract
 
         $entries = TimeEntry::query()->whereBelongsTo($first, 'task')->orderBy('start')->get();
         $this->assertSame([$body['description'], $body['description']], $entries->pluck('description')->all());
+        $this->assertSame([$body['markdown_notes'], $body['markdown_notes']], $entries->pluck('markdown_notes')->all());
         $this->assertSame([
             ['10:00', '10:20'],
             ['10:40', '11:00'],

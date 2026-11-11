@@ -57,6 +57,7 @@ class TaskTimerController extends Controller
             'session_id' => 'required_unless:action,start|uuid',
             'version' => 'required|integer|min:0',
             'description' => 'sometimes|required|string|max:5000',
+            'markdown_notes' => 'nullable|string|max:10000',
         ]);
         $action = $input['action'];
         if (in_array($action, ['start', 'resume', 'complete'], true) && ! $this->hasPermission($organization, 'tasks:update:all')) {
@@ -122,7 +123,7 @@ class TaskTimerController extends Controller
             }
 
             $description = $input['description'] ?? $task->name;
-            $count = $this->saveEntries($organization, $member, $project, $task, $session, $description);
+            $count = $this->saveEntries($organization, $member, $project, $task, $session, $description, $input['markdown_notes'] ?? null);
             // The Done list refreshes as soon as this transaction commits.
             $task->setComputedAttributeValue('spent_time');
             $task->done_at ??= $now;
@@ -135,7 +136,7 @@ class TaskTimerController extends Controller
         return response()->json(['saved_entries' => $saved]);
     }
 
-    private function saveEntries(Organization $organization, Member $member, Project $project, Task $task, TaskTimerSession $session, string $description): int
+    private function saveEntries(Organization $organization, Member $member, Project $project, Task $task, TaskTimerSession $session, string $description, ?string $markdownNotes): int
     {
         $billable = $project->is_billable && $this->canUseBillableRates($organization);
         foreach ($session->segments as $segment) {
@@ -158,6 +159,7 @@ class TaskTimerController extends Controller
             $entry->task()->associate($task);
             $entry->client()->associate($project->client_id);
             $entry->description = $description;
+            $entry->markdown_notes = $markdownNotes;
             $entry->start = $start;
             $entry->end = $end;
             $entry->billable = $billable;
