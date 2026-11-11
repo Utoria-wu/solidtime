@@ -16,6 +16,11 @@ export type TaskTimer = {
 
 export type TaskTimerAction = 'start' | 'pause' | 'resume' | 'complete';
 
+export type TaskTimerCompletion = {
+    description: string;
+    markdown_notes: string | null;
+};
+
 export function elapsedTaskSeconds(timer: TaskTimer, now: number) {
     return (
         timer.elapsed_seconds +
@@ -52,7 +57,7 @@ export function useTaskTimers() {
         taskId: string,
         action: TaskTimerAction,
         timer?: TaskTimer,
-        description?: string
+        completion?: TaskTimerCompletion
     ) {
         const organization = getCurrentOrganizationId();
         if (!organization) return;
@@ -60,7 +65,7 @@ export function useTaskTimers() {
             action,
             session_id: timer?.id,
             version: timer?.version ?? 0,
-            description,
+            ...completion,
         };
 
         try {
