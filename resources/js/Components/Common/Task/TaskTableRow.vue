@@ -30,6 +30,8 @@ import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import { Field, FieldLabel } from '@/packages/ui/src/field';
 
+const emit = defineEmits<{ openActivity: [] }>();
+
 const props = defineProps<{
     task: Task;
     timer?: TaskTimer;
@@ -135,9 +137,13 @@ const showTaskEditModal = ref(false);
     <TableRow>
         <div
             class="whitespace-nowrap min-w-0 flex items-center space-x-5 3xl:pl-12 py-4 pr-3 text-sm font-medium text-text-primary pl-4 sm:pl-6 lg:pl-8 3xl:pl-12">
-            <span class="truncate" :title="task.name">
+            <button
+                type="button"
+                class="truncate text-left hover:underline"
+                :title="task.name"
+                @click="emit('openActivity')">
                 {{ task.name }}
-            </span>
+            </button>
         </div>
         <div
             class="whitespace-nowrap px-3 py-4 flex items-center gap-1.5 text-sm"

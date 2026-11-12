@@ -5,6 +5,7 @@ import { PlusIcon } from '@heroicons/vue/16/solid';
 import { computed, ref } from 'vue';
 import { useTimestamp } from '@vueuse/core';
 import { useTaskTimers } from '@/utils/useTaskTimers';
+import TaskActivityDialog from './TaskActivityDialog.vue';
 import TaskTableRow from '@/Components/Common/Task/TaskTableRow.vue';
 import TaskTableHeading from '@/Components/Common/Task/TaskTableHeading.vue';
 import TaskCreateModal from '@/Components/Common/Task/TaskCreateModal.vue';
@@ -71,6 +72,13 @@ function handleSort(column: SortColumn) {
 }
 
 const createTask = ref(false);
+const activityTaskId = ref<string | null>(null);
+const activityOpen = ref(false);
+const activityTask = computed(() => props.tasks.find((task) => task.id === activityTaskId.value));
+function openActivity(task: Task) {
+    activityTaskId.value = task.id;
+    activityOpen.value = true;
+}
 const { timers, change, ready } = useTaskTimers();
 const timersByTask = computed(() => new Map(timers.value.map((timer) => [timer.task_id, timer])));
 const timestamp = useTimestamp({ interval: 1000 });
@@ -78,6 +86,7 @@ const now = computed(() => Math.floor(timestamp.value / 1000));
 </script>
 
 <template>
+    <TaskActivityDialog v-if="activityTask" v-model:open="activityOpen" :task="activityTask" />
     <TaskCreateModal v-model:show="createTask" :project-id="props.projectId"></TaskCreateModal>
     <div class="flow-root overflow-x-auto">
         <div class="inline-block min-w-full align-middle">
@@ -112,7 +121,8 @@ const now = computed(() => Math.floor(timestamp.value / 1000));
                         :timer="timersByTask.get(task.id)"
                         :timer-ready="ready"
                         :now="now"
-                        :change="change"></TaskTableRow>
+                        :change="change"
+                        @open-activity="openActivity(task)"></TaskTableRow>
                 </template>
             </div>
         </div>

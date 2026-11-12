@@ -32,7 +32,9 @@ const calendarStart = ref<Dayjs | undefined>(undefined);
 const calendarEnd = ref<Dayjs | undefined>(undefined);
 
 // Optional deep link (e.g. "Fix in calendar") that opens the calendar on a specific day
-const initialDate = new URLSearchParams(window.location.search).get('date');
+const calendarLink = new URLSearchParams(window.location.search);
+const initialDate = calendarLink.get('date');
+const initialEntryId = calendarLink.get('entry');
 
 // Test-injectable activity periods (for E2E testing).
 // These hooks are no-ops in production — they only take effect when test code
@@ -132,6 +134,7 @@ function onRefresh() {
             :currency="getOrganizationCurrencyString()"
             :can-create-project="canCreateProjects()"
             :initial-date="initialDate"
+            :initial-entry-id="initialEntryId"
             :organization-billable-rate="organization?.billable_rate ?? null"
             :create-time-entry="createTimeEntry"
             :update-time-entry="updateTimeEntry"
