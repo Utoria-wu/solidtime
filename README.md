@@ -15,7 +15,7 @@ Built the frontend and ran type checking and lint. Used Edge with the built asse
 
 ## Schedule across projects
 
-Open **Projects → Schedule** to see tasks grouped by project on one weekly timeline. Project search and filters also apply in this view. Completed tasks are hidden by default. Select **Show completed tasks** to display them with a **Done** label. Tasks without dates remain listed under their project. A subtle tint highlights the current day. To open a single project directly in Schedule, use **Open Schedule** in its actions menu.
+Open **Projects → Schedule** to see tasks grouped by project on one weekly timeline. Project search and filters also apply in this view. Completed tasks are hidden by default. Select **Show completed tasks** next to project search to display them with a **Done** label. Tasks without dates remain listed under their project. A subtle tint highlights the current day. To open a single project directly in Schedule, use **Open Schedule** in its actions menu.
 
 ![Projects overview showing multiple projects on the same weekly schedule](.github/feature-images/projects-overview-schedule.png)
 
