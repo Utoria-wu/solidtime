@@ -11,7 +11,7 @@ use Illuminate\Support\Carbon;
  * @property string $id
  * @property string $task_id
  * @property string $member_id
- * @property list<array{start: int, end: int}> $segments
+ * @property list<array{start: int, end: int, markdown_notes?: string|null}> $segments
  * @property Carbon|null $started_at
  * @property int $version
  */

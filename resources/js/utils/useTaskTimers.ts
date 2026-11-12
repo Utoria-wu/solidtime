@@ -17,7 +17,7 @@ export type TaskTimer = {
 export type TaskTimerAction = 'start' | 'pause' | 'resume' | 'complete';
 
 export type TaskTimerCompletion = {
-    description: string;
+    description?: string;
     markdown_notes: string | null;
 };
 

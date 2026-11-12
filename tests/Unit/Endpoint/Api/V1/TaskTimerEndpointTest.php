@@ -33,7 +33,8 @@ class TaskTimerEndpointTest extends ApiEndpointTestAbstract
         $this->travel(10)->minutes();
         $this->postJson($secondUrl, ['action' => 'start', 'version' => 0])->assertOk();
         $this->travel(10)->minutes();
-        $this->postJson($firstUrl, ['action' => 'pause', 'session_id' => $firstId, 'version' => 0])->assertOk();
+        $pauseNotes = '## Completed before pause';
+        $this->postJson($firstUrl, ['action' => 'pause', 'session_id' => $firstId, 'version' => 0, 'markdown_notes' => $pauseNotes])->assertOk();
         $this->travel(20)->minutes();
         $this->postJson($firstUrl, ['action' => 'resume', 'session_id' => $firstId, 'version' => 1])->assertOk();
         $this->travel(20)->minutes();
@@ -57,7 +58,7 @@ class TaskTimerEndpointTest extends ApiEndpointTestAbstract
 
         $entries = TimeEntry::query()->whereBelongsTo($first, 'task')->orderBy('start')->get();
         $this->assertSame([$body['description'], $body['description']], $entries->pluck('description')->all());
-        $this->assertSame([$body['markdown_notes'], $body['markdown_notes']], $entries->pluck('markdown_notes')->all());
+        $this->assertSame([$pauseNotes."\n\n".$body['markdown_notes'], $body['markdown_notes']], $entries->pluck('markdown_notes')->all());
         $this->assertSame([
             ['10:00', '10:20'],
             ['10:40', '11:00'],

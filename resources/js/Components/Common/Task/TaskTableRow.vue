@@ -45,27 +45,48 @@ const props = defineProps<{
 
 const saving = ref(false);
 const completionTimerId = ref<string | null>(null);
+const dialogAction = ref<'pause' | 'complete'>('complete');
+const pauseVersion = ref<number | null>(null);
 const eventName = ref('');
 const notes = ref<string | null>(null);
 const eventNameId = computed(() => `calendar-event-name-${props.task.id}`);
+const timerAvailable = computed(
+    () =>
+        !!props.timer &&
+        props.timer.id === completionTimerId.value &&
+        (dialogAction.value === 'complete' ||
+            (props.timer.started_at !== null && props.timer.version === pauseVersion.value))
+);
 const canSaveCompletion = computed(
     () =>
         !saving.value &&
-        props.timer?.id === completionTimerId.value &&
-        eventName.value.trim().length > 0
+        timerAvailable.value &&
+        (dialogAction.value === 'pause' || eventName.value.trim().length > 0)
 );
 
 function openCompletion() {
     if (!props.timer || saving.value) return;
+    dialogAction.value = 'complete';
     eventName.value = props.task.name;
     notes.value = null;
     completionTimerId.value = props.timer.id;
 }
 
+function handleTimerButton() {
+    const timer = props.timer;
+    if (!timer) return void changeTimer('start');
+    if (timer.started_at === null) return void changeTimer('resume');
+
+    dialogAction.value = 'pause';
+    pauseVersion.value = timer.version;
+    notes.value = null;
+    completionTimerId.value = timer.id;
+}
+
 function submitCompletion() {
     if (canSaveCompletion.value) {
-        void changeTimer('complete', {
-            description: eventName.value.trim(),
+        void changeTimer(dialogAction.value, {
+            description: dialogAction.value === 'complete' ? eventName.value.trim() : undefined,
             markdown_notes: notes.value?.trim() ? notes.value : null,
         });
     }
@@ -76,7 +97,7 @@ async function changeTimer(action: TaskTimerAction, completion?: TaskTimerComple
     saving.value = true;
     try {
         await props.change(props.task.id, action, props.timer, completion);
-        if (action === 'complete') completionTimerId.value = null;
+        if (action === 'complete' || action === 'pause') completionTimerId.value = null;
     } catch {
         // The API notification shows the error.
     } finally {
@@ -187,9 +208,7 @@ const showTaskEditModal = ref(false);
                             : 'Pause timer'
                         : 'Start timer'
                 "
-                @click="
-                    changeTimer(timer ? (timer.started_at === null ? 'resume' : 'pause') : 'start')
-                ">
+                @click="handleTimerButton">
                 <PauseIcon v-if="timer?.started_at" class="size-4" />
                 <PlayIcon v-else class="size-4" />
             </button>
@@ -217,9 +236,11 @@ const showTaskEditModal = ref(false);
             max-width="lg"
             @close="completionTimerId = null"
             @submit="submitCompletion">
-            <template #title>Save to Calendar</template>
+            <template #title>{{
+                dialogAction === 'pause' ? 'Pause task timer' : 'Save to Calendar'
+            }}</template>
             <template #content>
-                <Field>
+                <Field v-if="dialogAction === 'complete'">
                     <FieldLabel :for="eventNameId">Event name</FieldLabel>
                     <TextInput
                         :id="eventNameId"
@@ -232,13 +253,17 @@ const showTaskEditModal = ref(false);
                         autofocus
                         @keydown.enter.exact.prevent="!$event.isComposing && submitCompletion()" />
                 </Field>
-                <template v-if="timer?.id === completionTimerId">
+                <template v-if="timerAvailable">
                     <fieldset :disabled="saving" class="mt-4">
                         <TimeEntryNotesField v-model="notes" />
                     </fieldset>
-                    <p class="mt-3">
-                        Each timed segment will use this event name and notes. Saving also marks the
-                        task as Done.
+                    <p v-if="dialogAction === 'pause'" class="mt-3">
+                        Record what you completed in this segment. The timer pauses when you
+                        confirm.
+                    </p>
+                    <p v-else class="mt-3">
+                        Completion notes are added to each time entry alongside any notes from its
+                        pause. Saving marks the task as Done.
                     </p>
                 </template>
                 <p v-else role="alert" class="mt-3">This timer is no longer available.</p>
@@ -251,7 +276,13 @@ const showTaskEditModal = ref(false);
                     class="ms-3"
                     :disabled="!canSaveCompletion"
                     @click="submitCompletion">
-                    {{ saving ? 'Saving…' : 'Save and complete' }}
+                    {{
+                        saving
+                            ? 'Saving…'
+                            : dialogAction === 'pause'
+                              ? 'Pause timer'
+                              : 'Save and complete'
+                    }}
                 </PrimaryButton>
             </template>
         </DialogModal>
