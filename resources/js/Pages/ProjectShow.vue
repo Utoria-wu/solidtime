@@ -205,6 +205,7 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                         <TaskTable
                             :tasks="shownTasks"
                             :project-id="projectId"
+                            :allow-schedule="activeTab === 'active'"
                             :sort-column="tableState.sortColumn"
                             :sort-direction="tableState.sortDirection"
                             @sort="handleSort"></TaskTable>

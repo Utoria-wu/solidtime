@@ -136,7 +136,8 @@ const showTaskEditModal = ref(false);
 <template>
     <TableRow>
         <div
-            class="whitespace-nowrap min-w-0 flex items-center space-x-5 3xl:pl-12 py-4 pr-3 text-sm font-medium text-text-primary pl-4 sm:pl-6 lg:pl-8 3xl:pl-12">
+            class="whitespace-nowrap min-w-0 flex py-4 pr-3 text-sm font-medium text-text-primary pl-4 sm:pl-6 lg:pl-8 3xl:pl-12"
+            :class="$slots.timeline ? 'flex-col justify-center gap-1' : 'items-center space-x-5'">
             <button
                 type="button"
                 class="truncate text-left hover:underline"
@@ -144,8 +145,10 @@ const showTaskEditModal = ref(false);
                 @click="emit('openActivity')">
                 {{ task.name }}
             </button>
+            <slot name="planned-dates" />
         </div>
         <div
+            v-if="!$slots.timeline"
             class="whitespace-nowrap px-3 py-4 flex items-center gap-1.5 text-sm"
             :class="
                 overdue ? 'text-red-500' : dueToday ? 'text-accent-500' : 'text-text-secondary'
@@ -171,7 +174,9 @@ const showTaskEditModal = ref(false);
             </span>
             <span v-else> -- </span>
         </div>
-        <div class="whitespace-nowrap px-3 flex items-center text-sm text-text-secondary">
+        <div
+            v-if="!$slots.timeline"
+            class="whitespace-nowrap px-3 flex items-center text-sm text-text-secondary">
             <UpgradeBadge
                 v-if="!isAllowedToPerformPremiumAction()"
                 feature="estimates"></UpgradeBadge>
@@ -235,6 +240,7 @@ const showTaskEditModal = ref(false);
                 @edit="showTaskEditModal = true"
                 @delete="deleteTask"></TaskMoreOptionsDropdown>
         </div>
+        <slot name="timeline" />
         <TaskEditModal v-model:show="showTaskEditModal" :task="task"></TaskEditModal>
         <DialogModal
             :show="completionTimerId !== null"
