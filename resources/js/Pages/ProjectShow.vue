@@ -14,7 +14,7 @@ import {
     PencilSquareIcon,
 } from '@heroicons/vue/20/solid';
 
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
 import TaskCreateModal from '@/Components/Common/Task/TaskCreateModal.vue';
 import TaskTable from '@/Components/Common/Task/TaskTable.vue';
 import type { SortColumn } from '@/Components/Common/Task/TaskTable.vue';
@@ -68,6 +68,7 @@ const billableRateFormatted = computed(() => {
 });
 
 const activeTab = ref<'active' | 'done'>('active');
+const openSchedule = new URLSearchParams(usePage().url.split('?')[1]).get('view') === 'schedule';
 
 const { tasks } = useTasksQuery();
 const { timers } = useTaskTimers();
@@ -206,6 +207,7 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                             :tasks="shownTasks"
                             :project-id="projectId"
                             :allow-schedule="activeTab === 'active'"
+                            :initial-view="openSchedule ? 'schedule' : 'list'"
                             :sort-column="tableState.sortColumn"
                             :sort-direction="tableState.sortDirection"
                             @sort="handleSort"></TaskTable>

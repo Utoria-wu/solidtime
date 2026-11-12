@@ -68,6 +68,10 @@ const mark = computed(() => {
 .schedule-track[data-tone='upcoming'] {
     --mark-color: #817397;
 }
+.schedule-track[data-tone='done'] {
+    --mark-color: var(--color-text-secondary);
+    --mark-end: color-mix(in oklch, var(--mark-color) 32%, var(--theme-color-default-background));
+}
 .schedule-cell,
 .schedule-mark {
     grid-row: 1;
