@@ -7,6 +7,7 @@ import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import { useFocus } from '@vueuse/core';
 import { useTasksStore } from '@/utils/useTasks';
 import ProjectDropdown from '@/Components/Common/Project/ProjectDropdown.vue';
+import TimeEntryNotesField from '@/packages/ui/src/TimeEntry/TimeEntryNotesField.vue';
 import TaskDatesField from './TaskDatesField.vue';
 import EstimatedTimeSection from '@/packages/ui/src/EstimatedTimeSection.vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
@@ -20,13 +21,17 @@ const show = defineModel('show', { default: false });
 const saving = ref(false);
 
 const taskName = ref('');
+const taskNotes = ref<string | null>(null);
 const taskDates = ref<{ start_date: string | null; due_date: string | null }>({
     start_date: null,
     due_date: null,
 });
 
 watch(show, (open) => {
-    if (open) taskDates.value = { start_date: null, due_date: null };
+    if (open) {
+        taskNotes.value = null;
+        taskDates.value = { start_date: null, due_date: null };
+    }
 });
 const estimatedTime = ref<number | null>(null);
 
@@ -47,6 +52,7 @@ async function submit() {
     await createTask({
         name: taskName.value,
         ...taskDates.value,
+        markdown_notes: taskNotes.value,
         project_id: taskProjectId.value,
         estimated_time: estimatedTime.value,
     });
@@ -105,6 +111,7 @@ useFocus(taskNameInput, { initialValue: true });
                         v-model="estimatedTime"
                         @submit="submit()"></EstimatedTimeSection>
                 </div>
+                <TimeEntryNotesField v-model="taskNotes" label="Task notes" />
             </FieldGroup>
         </template>
         <template #footer>
