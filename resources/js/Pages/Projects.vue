@@ -263,6 +263,12 @@ const showBillableRate = computed(() => {
                         placeholder="Search projects..."
                         class="w-60 border-transparent bg-transparent pl-7 shadow-none placeholder:text-text-tertiary hover:bg-black/5 focus-visible:bg-input-background dark:hover:bg-white/5 [&::-webkit-search-cancel-button]:hidden" />
                 </div>
+                <label
+                    v-if="projectView === 'schedule'"
+                    class="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-text-secondary">
+                    <Checkbox v-model:checked="showDoneTasks" />
+                    Show completed tasks
+                </label>
             </div>
         </MainContainer>
 
@@ -290,15 +296,7 @@ const showBillableRate = computed(() => {
                 :tasks="scheduleTasks"
                 :schedule-projects="scheduleProjects"
                 sort-column="name"
-                sort-direction="asc">
-                <template #schedule-filters>
-                    <label
-                        class="flex cursor-pointer items-center gap-2 text-sm text-text-secondary">
-                        <Checkbox v-model:checked="showDoneTasks" />
-                        Show completed tasks
-                    </label>
-                </template>
-            </TaskTable>
+                sort-direction="asc" />
         </MainContainer>
     </AppLayout>
 </template>

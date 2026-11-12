@@ -174,7 +174,6 @@ const rowGroups = computed(() => {
                 {{ option }}
             </button>
         </div>
-        <slot v-if="showSchedule" name="schedule-filters" />
         <div v-if="showSchedule" class="ml-auto flex items-center gap-2 text-sm">
             <SecondaryButton @click="weekOffset = 0">Today</SecondaryButton>
             <SecondaryButton aria-label="Previous week" @click="weekOffset--">‹</SecondaryButton>
