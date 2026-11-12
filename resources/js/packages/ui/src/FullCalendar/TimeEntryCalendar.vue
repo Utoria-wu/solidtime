@@ -79,6 +79,7 @@ const props = defineProps<{
     organizationBillableRate: number | null;
     // Local date (YYYY-MM-DD) to open the calendar on, e.g. from a "Fix in calendar" deep link
     initialDate?: string | null;
+    initialEntryId?: string | null;
 
     createTimeEntry: (
         entry: Omit<TimeEntry, 'id' | 'organization_id' | 'user_id'>
@@ -99,6 +100,17 @@ const showCreateTimeEntryModal = ref<boolean>(false);
 const showEditTimeEntryModal = ref<boolean>(false);
 const selectedTimeEntry = ref<TimeEntry | null>(null);
 const contextMenuOpen = ref(false);
+let openedLinkedEntry = false;
+watch(
+    () => props.timeEntries.find((entry) => entry.id === props.initialEntryId),
+    (entry) => {
+        if (openedLinkedEntry || !entry?.end) return;
+        openedLinkedEntry = true;
+        selectedTimeEntry.value = entry;
+        showEditTimeEntryModal.value = true;
+    },
+    { immediate: true, flush: 'post' }
+);
 
 const rootRef = ref<HTMLElement | null>(null);
 const scrollerRef = ref<HTMLElement | null>(null);
