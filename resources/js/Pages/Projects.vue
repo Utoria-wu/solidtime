@@ -6,6 +6,7 @@ import { Search } from '@lucide/vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import ProjectTable from '@/Components/Common/Project/ProjectTable.vue';
 import TaskTable from '@/Components/Common/Task/TaskTable.vue';
+import Checkbox from '@/packages/ui/src/Input/Checkbox.vue';
 import { useTasksQuery } from '@/utils/useTasksQuery';
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import { computed, ref } from 'vue';
@@ -71,13 +72,16 @@ const { tableState, handleSort } = useTableSortState<SortColumn, ProjectTableSta
 // Not persisted, so a reload never starts silently filtered
 const search = ref('');
 const projectView = ref<'list' | 'schedule'>('list');
+const showDoneTasks = ref(false);
 const { tasks, isPending: tasksPending, isError: tasksError } = useTasksQuery();
 const scheduleProjects = computed(() =>
     [...filteredProjects.value].sort((left, right) => left.name.localeCompare(right.name))
 );
 const scheduleTasks = computed(() => {
     const projectIds = new Set(scheduleProjects.value.map((project) => project.id));
-    return tasks.value.filter((task) => projectIds.has(task.project_id));
+    return tasks.value.filter(
+        (task) => projectIds.has(task.project_id) && (showDoneTasks.value || !task.is_done)
+    );
 });
 
 // Filter projects based on current filters
@@ -286,7 +290,15 @@ const showBillableRate = computed(() => {
                 :tasks="scheduleTasks"
                 :schedule-projects="scheduleProjects"
                 sort-column="name"
-                sort-direction="asc" />
+                sort-direction="asc">
+                <template #schedule-filters>
+                    <label
+                        class="flex cursor-pointer items-center gap-2 text-sm text-text-secondary">
+                        <Checkbox v-model:checked="showDoneTasks" />
+                        Show completed tasks
+                    </label>
+                </template>
+            </TaskTable>
         </MainContainer>
     </AppLayout>
 </template>

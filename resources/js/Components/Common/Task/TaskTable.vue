@@ -174,6 +174,7 @@ const rowGroups = computed(() => {
                 {{ option }}
             </button>
         </div>
+        <slot v-if="showSchedule" name="schedule-filters" />
         <div v-if="showSchedule" class="ml-auto flex items-center gap-2 text-sm">
             <SecondaryButton @click="weekOffset = 0">Today</SecondaryButton>
             <SecondaryButton aria-label="Previous week" @click="weekOffset--">‹</SecondaryButton>
@@ -302,6 +303,6 @@ const rowGroups = computed(() => {
     );
 }
 .schedule-day.schedule-today {
-    background: color-mix(in oklch, #70b3cf 17%, var(--theme-color-default-background));
+    background: color-mix(in oklch, #70b3cf 8%, var(--theme-color-default-background));
 }
 </style>
