@@ -24,12 +24,18 @@ The task name and manual time entry description fields also opt out of browser f
 
 ## Notes when completing a project task
 
-In a project, start a task timer and open **Save to Calendar** to complete the task. Add optional Markdown notes and use **Preview** to check the result. Each time entry saved from the timer carries the same event name and notes. Open an entry in Calendar to edit its notes.
+In a project, start a task timer and open **Save to Calendar** to complete the task. Add optional Markdown notes and use **Preview** to check the result. Each time entry saved from the timer carries the same event name and completion notes. Open an entry in Calendar to edit its notes.
 
 ![Previewing Markdown notes before saving a completed task to Calendar](.github/feature-images/project-completion-notes.png)
 
+## Notes when pausing a task timer
+
+When I pause a task, I want to record what I finished before moving on. The pause dialog accepts optional Markdown notes and previews them before I confirm. After I resume and complete the task, the Calendar entry for the paused segment includes those notes. Any notes added at completion are included alongside them.
+
+![Markdown checklist in the task timer pause dialog](.github/feature-images/task-pause-notes.png)
+
 ## Verification
 
-The screenshots use a local demo with sample data. Browser testing covered creating a task date range, reopening it after reload, clearing it, and creating and editing a Calendar note. API tests cover invalid task ranges, preserving dates on status-only updates, and preserving and clearing Markdown independently of the event title.
+The screenshots use a local demo with sample data. Browser testing covered creating a task date range, reopening it after reload, clearing it, and creating and editing a Calendar note. Browser testing also verified that pause notes survive reload and appear alongside completion notes on the corresponding Calendar entry. API tests cover invalid task ranges, preserving dates on status-only updates, and preserving and clearing Markdown independently of the event title.
 
 [Solidtime project README](https://github.com/solidtime-io/solidtime/blob/main/README.md)
