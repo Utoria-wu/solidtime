@@ -23,11 +23,13 @@ export type SortColumn = 'name' | 'due_date' | 'spent_time' | 'progress';
 export type { SortDirection } from '@/utils/useSortableTable';
 
 const props = defineProps<{
-    projectId: string;
+    projectId?: string;
     tasks: Task[];
     sortColumn: SortColumn;
     sortDirection: SortDirection;
     allowSchedule?: boolean;
+    initialView?: 'list' | 'schedule';
+    scheduleProjects?: { id: string; name: string }[];
 }>();
 
 const emit = defineEmits<{
@@ -86,8 +88,10 @@ const { timers, change, ready } = useTaskTimers();
 const timersByTask = computed(() => new Map(timers.value.map((timer) => [timer.task_id, timer])));
 const timestamp = useTimestamp({ interval: 1000 });
 const now = computed(() => Math.floor(timestamp.value / 1000));
-const view = ref<'list' | 'schedule'>('list');
-const showSchedule = computed(() => props.allowSchedule && view.value === 'schedule');
+const view = ref<'list' | 'schedule'>(props.initialView ?? 'list');
+const showSchedule = computed(
+    () => !!props.scheduleProjects || (props.allowSchedule && view.value === 'schedule')
+);
 const weekOffset = ref(0);
 const today = computed(() =>
     getLocalizedDayJs(new Date(timestamp.value).toISOString()).format('YYYY-MM-DD')
@@ -115,6 +119,21 @@ function taskGroup(task: Task) {
 }
 const rowGroups = computed(() => {
     if (!showSchedule.value) return [{ id: 'list', label: '', tasks: sortedTasks.value }];
+    if (props.scheduleProjects) {
+        const byProject = new Map<string, Task[]>();
+        for (const task of sortedTasks.value) {
+            const projectTasks = byProject.get(task.project_id) ?? [];
+            projectTasks.push(task);
+            byProject.set(task.project_id, projectTasks);
+        }
+        return props.scheduleProjects
+            .map((project) => ({
+                id: project.id,
+                label: project.name,
+                tasks: byProject.get(project.id) ?? [],
+            }))
+            .filter((group) => group.tasks.length);
+    }
     return groups
         .map((group) => ({
             ...group,
@@ -136,9 +155,15 @@ const rowGroups = computed(() => {
 
 <template>
     <TaskActivityDialog v-if="activityTask" v-model:open="activityOpen" :task="activityTask" />
-    <TaskCreateModal v-model:show="createTask" :project-id="props.projectId"></TaskCreateModal>
-    <div v-if="allowSchedule" class="flex flex-wrap items-center justify-between gap-3 py-3">
-        <div role="group" aria-label="Task view" class="flex gap-1 rounded-lg bg-tertiary p-1">
+    <TaskCreateModal v-if="projectId" v-model:show="createTask" :project-id="projectId" />
+    <div
+        v-if="allowSchedule || scheduleProjects"
+        class="flex flex-wrap items-center justify-between gap-3 py-3">
+        <div
+            v-if="allowSchedule"
+            role="group"
+            aria-label="Task view"
+            class="flex gap-1 rounded-lg bg-tertiary p-1">
             <button
                 v-for="option in ['list', 'schedule'] as const"
                 :key="option"
@@ -149,7 +174,7 @@ const rowGroups = computed(() => {
                 {{ option }}
             </button>
         </div>
-        <div v-if="showSchedule" class="flex items-center gap-2 text-sm">
+        <div v-if="showSchedule" class="ml-auto flex items-center gap-2 text-sm">
             <SecondaryButton @click="weekOffset = 0">Today</SecondaryButton>
             <SecondaryButton aria-label="Previous week" @click="weekOffset--">‹</SecondaryButton>
             <span class="min-w-40 text-center font-medium" aria-live="polite">{{ weekLabel }}</span>
@@ -188,16 +213,17 @@ const rowGroups = computed(() => {
                             :aria-current="weekDates[index] === today ? 'date' : undefined">
                             {{ day.format('ddd') }}
                             <strong class="text-sm text-text-primary">{{ day.format('D') }}</strong>
-                            <span v-if="weekDates[index] === today">Today</span>
                         </div>
                     </div>
                 </div>
                 <div v-if="sortedTasks.length === 0" class="col-span-full py-24 text-center">
                     <PlusCircleIcon class="w-8 text-icon-default inline pb-2"></PlusCircleIcon>
                     <h3 class="text-text-primary font-semibold">No tasks found</h3>
-                    <p v-if="canCreateTasks()" class="pb-5">Create your first task now!</p>
+                    <p v-if="projectId && canCreateTasks()" class="pb-5">
+                        Create your first task now!
+                    </p>
                     <SecondaryButton
-                        v-if="canCreateTasks()"
+                        v-if="projectId && canCreateTasks()"
                         :icon="PlusIcon"
                         @click="createTask = true"
                         >Create your First Task
@@ -234,6 +260,7 @@ const rowGroups = computed(() => {
                                 <template v-if="!task.start_date && !task.due_date"
                                     >No dates set</template
                                 >
+                                <span v-if="scheduleProjects && task.is_done"> · Done</span>
                             </span>
                         </template>
                         <template v-if="showSchedule" #timeline>
@@ -241,7 +268,7 @@ const rowGroups = computed(() => {
                                 :dates="weekDates"
                                 :today="today"
                                 :task="task"
-                                :tone="group.id" />
+                                :tone="task.is_done ? 'done' : taskGroup(task)" />
                         </template>
                     </TaskTableRow>
                 </template>

@@ -5,6 +5,8 @@ import { FolderIcon, PlusIcon } from '@heroicons/vue/20/solid';
 import { Search } from '@lucide/vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import ProjectTable from '@/Components/Common/Project/ProjectTable.vue';
+import TaskTable from '@/Components/Common/Task/TaskTable.vue';
+import { useTasksQuery } from '@/utils/useTasksQuery';
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import { computed, ref } from 'vue';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
@@ -21,7 +23,9 @@ import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { useStorage } from '@vueuse/core';
 import { useTableSortState } from '@/utils/useTableSortState';
-import ProjectsFilterDropdown, { type ProjectFilters } from '@/Components/Common/Project/ProjectsFilterDropdown.vue';
+import ProjectsFilterDropdown, {
+    type ProjectFilters,
+} from '@/Components/Common/Project/ProjectsFilterDropdown.vue';
 import ProjectStatusFilterBadge from '@/Components/Common/Project/ProjectStatusFilterBadge.vue';
 import ProjectVisibilityFilterBadge from '@/Components/Common/Project/ProjectVisibilityFilterBadge.vue';
 import ProjectClientFilterBadge from '@/Components/Common/Project/ProjectClientFilterBadge.vue';
@@ -66,6 +70,15 @@ const { tableState, handleSort } = useTableSortState<SortColumn, ProjectTableSta
 
 // Not persisted, so a reload never starts silently filtered
 const search = ref('');
+const projectView = ref<'list' | 'schedule'>('list');
+const { tasks, isPending: tasksPending, isError: tasksError } = useTasksQuery();
+const scheduleProjects = computed(() =>
+    [...filteredProjects.value].sort((left, right) => left.name.localeCompare(right.name))
+);
+const scheduleTasks = computed(() => {
+    const projectIds = new Set(scheduleProjects.value.map((project) => project.id));
+    return tasks.value.filter((task) => projectIds.has(task.project_id));
+});
 
 // Filter projects based on current filters
 const filteredProjects = computed(() => {
@@ -163,6 +176,20 @@ const showBillableRate = computed(() => {
         <MainContainer class="py-3 sm:pt-5 flex justify-between items-center">
             <div class="flex items-center space-x-3 sm:space-x-6">
                 <PageTitle :icon="FolderIcon" title="Projects"></PageTitle>
+                <div
+                    role="group"
+                    aria-label="Projects view"
+                    class="flex gap-1 rounded-lg bg-tertiary p-1">
+                    <button
+                        v-for="view in ['list', 'schedule'] as const"
+                        :key="view"
+                        type="button"
+                        :aria-pressed="projectView === view"
+                        class="rounded-md px-3 py-1.5 text-sm capitalize text-text-secondary aria-pressed:bg-default-background aria-pressed:text-text-primary aria-pressed:shadow-sm"
+                        @click="projectView = view">
+                        {{ view }}
+                    </button>
+                </div>
             </div>
             <SecondaryButton
                 v-if="canCreateProjects()"
@@ -236,6 +263,7 @@ const showBillableRate = computed(() => {
         </MainContainer>
 
         <ProjectTable
+            v-if="projectView === 'list'"
             :show-billable-rate="showBillableRate"
             :is-filtered="hasActiveFilters"
             :is-loading="projectsLoading"
@@ -243,5 +271,22 @@ const showBillableRate = computed(() => {
             :sort-column="tableState.sortColumn"
             :sort-direction="tableState.sortDirection"
             @sort="handleSort"></ProjectTable>
+        <MainContainer v-else class="pb-6">
+            <p v-if="tasksError" role="alert" class="py-6 text-sm text-text-secondary">
+                Could not load tasks.
+            </p>
+            <p
+                v-else-if="projectsLoading || tasksPending"
+                role="status"
+                class="py-6 text-sm text-text-secondary">
+                Loading schedule…
+            </p>
+            <TaskTable
+                v-else
+                :tasks="scheduleTasks"
+                :schedule-projects="scheduleProjects"
+                sort-column="name"
+                sort-direction="asc" />
+        </MainContainer>
     </AppLayout>
 </template>

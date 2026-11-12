@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { TrashIcon, PencilSquareIcon, ArchiveBoxIcon } from '@heroicons/vue/20/solid';
+import {
+    TrashIcon,
+    PencilSquareIcon,
+    ArchiveBoxIcon,
+    CalendarDaysIcon,
+} from '@heroicons/vue/20/solid';
+import { router } from '@inertiajs/vue3';
 import type { Project } from '@/packages/api/src';
 import { canDeleteProjects, canUpdateProjects } from '@/utils/permissions';
 import {
@@ -17,6 +23,10 @@ const emit = defineEmits<{
 const props = defineProps<{
     project: Project;
 }>();
+
+function openSchedule() {
+    router.visit(route('projects.show', { project: props.project.id, view: 'schedule' }));
+}
 </script>
 
 <template>
@@ -40,6 +50,12 @@ const props = defineProps<{
             </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent class="min-w-[150px]" align="end">
+            <DropdownMenuItem
+                class="flex items-center space-x-3 cursor-pointer"
+                @select="openSchedule">
+                <CalendarDaysIcon class="w-5 text-icon-active" />
+                <span>Open Schedule</span>
+            </DropdownMenuItem>
             <DropdownMenuItem
                 v-if="canUpdateProjects()"
                 :aria-label="'Edit Project ' + props.project.name"
