@@ -109,6 +109,7 @@ class TaskController extends Controller
         $task = new Task;
         $task->name = $request->input('name');
         $task->project_id = $request->input('project_id');
+        $task->markdown_notes = $request->validated('markdown_notes');
         $task->start_date = $request->date('start_date', 'Y-m-d');
         $task->due_date = $request->date('due_date', 'Y-m-d');
         if ($this->canAccessPremiumFeatures($organization) && $request->has('estimated_time')) {
@@ -143,6 +144,9 @@ class TaskController extends Controller
         $task->name = $request->input('name');
         if ($this->canAccessPremiumFeatures($organization) && $request->has('estimated_time')) {
             $task->estimated_time = $request->getEstimatedTime();
+        }
+        if ($request->has('markdown_notes')) {
+            $task->markdown_notes = $request->validated('markdown_notes');
         }
         if ($request->has('start_date') && $request->has('due_date')) {
             $task->start_date = $request->date('start_date', 'Y-m-d');
