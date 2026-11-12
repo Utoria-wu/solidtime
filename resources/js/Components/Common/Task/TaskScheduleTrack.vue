@@ -93,9 +93,9 @@ const mark = computed(() => {
 .schedule-cell.today {
     background: linear-gradient(
         90deg,
-        color-mix(in oklch, #70b3cf 12%, var(--theme-color-default-background)),
-        color-mix(in oklch, #70b3cf 21%, var(--theme-color-default-background)),
-        color-mix(in oklch, #70b3cf 12%, var(--theme-color-default-background))
+        color-mix(in oklch, #70b3cf 6%, var(--theme-color-default-background)),
+        color-mix(in oklch, #70b3cf 10%, var(--theme-color-default-background)),
+        color-mix(in oklch, #70b3cf 6%, var(--theme-color-default-background))
     );
     position: relative;
 }
