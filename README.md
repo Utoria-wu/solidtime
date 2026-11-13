@@ -8,7 +8,15 @@ Existing records use their stored timestamps. Reopening a task clears the comple
 
 ![Completed tasks with creation and completion dates](.github/feature-images/tasks-created-completed-dates.png)
 
+New tasks start with both planned dates set to today in the user's time zone. The date picker marks the start in blue and the due date in amber, with both colors on a single-day range.
+
+![Task dates default to today](.github/feature-images/task-dates-today.png)
+
+![Blue start date and amber due date markers](.github/feature-images/task-dates-range.png)
+
 ## Verification
+
+The updated date picker was checked in Edge with the default day and with a multi-day range.
 
 The frontend build and TypeScript check passed. A local browser and API check verified project and task timestamps, both list views, sorting controls, repeated completion, and reopening.
 
