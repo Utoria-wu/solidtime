@@ -153,7 +153,7 @@ class TaskController extends Controller
             $task->due_date = $request->date('due_date', 'Y-m-d');
         }
         if ($request->has('is_done')) {
-            $task->done_at = $request->getIsDone() ? Carbon::now() : null;
+            $task->done_at = $request->getIsDone() ? ($task->done_at ?? Carbon::now()) : null;
         }
         $task->save();
 

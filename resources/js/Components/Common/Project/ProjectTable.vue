@@ -10,7 +10,14 @@ import Pagination from '@/packages/ui/src/Pagination.vue';
 import LoadingSpinner from '@/packages/ui/src/LoadingSpinner.vue';
 
 export type SortColumn =
-    'name' | 'client_name' | 'spent_time' | 'progress' | 'billable_rate' | 'status' | 'visibility';
+    | 'name'
+    | 'created_at'
+    | 'client_name'
+    | 'spent_time'
+    | 'progress'
+    | 'billable_rate'
+    | 'status'
+    | 'visibility';
 export type { SortDirection } from '@/utils/useSortableTable';
 import { canCreateProjects } from '@/utils/permissions';
 import type { CreateProjectBody, Project, Client, CreateClientBody } from '@/packages/api/src';
@@ -63,6 +70,11 @@ const columns = computed<SortableColumnDef<Project, SortColumn>[]>(() => [
     {
         id: 'name',
         accessorFn: (row: Project) => row.name.toLowerCase(),
+    },
+    {
+        id: 'created_at',
+        sortDescFirst: true,
+        accessorFn: (row: Project) => row.created_at ?? undefined,
     },
     {
         id: 'client_name',
@@ -161,7 +173,7 @@ async function createClient(client: CreateClientBody): Promise<Client | undefine
 }
 
 const gridTemplate = computed(() => {
-    return `grid-template-columns: minmax(12rem, 1fr) var(--progress-column) repeat(2, max-content) var(--progress-column) ${props.showBillableRate ? 'max-content' : ''} max-content max-content max-content;`;
+    return `grid-template-columns: minmax(12rem, 1fr) minmax(7.5rem, max-content) var(--progress-column) repeat(2, max-content) var(--progress-column) ${props.showBillableRate ? 'max-content' : ''} max-content max-content max-content;`;
 });
 </script>
 

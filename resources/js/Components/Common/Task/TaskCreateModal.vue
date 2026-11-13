@@ -8,6 +8,7 @@ import { useFocus } from '@vueuse/core';
 import { useTasksStore } from '@/utils/useTasks';
 import ProjectDropdown from '@/Components/Common/Project/ProjectDropdown.vue';
 import TimeEntryNotesField from '@/packages/ui/src/TimeEntry/TimeEntryNotesField.vue';
+import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import TaskDatesField from './TaskDatesField.vue';
 import EstimatedTimeSection from '@/packages/ui/src/EstimatedTimeSection.vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
@@ -27,12 +28,17 @@ const taskDates = ref<{ start_date: string | null; due_date: string | null }>({
     due_date: null,
 });
 
-watch(show, (open) => {
-    if (open) {
-        taskNotes.value = null;
-        taskDates.value = { start_date: null, due_date: null };
-    }
-});
+watch(
+    show,
+    (open) => {
+        if (open) {
+            taskNotes.value = null;
+            const today = getLocalizedDayJs().format('YYYY-MM-DD');
+            taskDates.value = { start_date: today, due_date: today };
+        }
+    },
+    { immediate: true }
+);
 const estimatedTime = ref<number | null>(null);
 
 const props = defineProps<{

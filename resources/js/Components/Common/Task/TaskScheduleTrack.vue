@@ -15,7 +15,7 @@ const mark = computed(() => {
     const first = start || due;
     const last = due || start;
     const weekStart = props.dates[0];
-    const weekEnd = props.dates[6];
+    const weekEnd = props.dates.at(-1);
     if (!first || !last || !weekStart || !weekEnd || last < weekStart || first > weekEnd) {
         return null;
     }
@@ -23,7 +23,7 @@ const mark = computed(() => {
     const endsAfter = last > weekEnd;
     return {
         from: startsBefore ? 1 : props.dates.indexOf(first) + 1,
-        to: endsAfter ? 8 : props.dates.indexOf(last) + 2,
+        to: endsAfter ? props.dates.length + 1 : props.dates.indexOf(last) + 2,
         point: first === last,
         startsBefore,
         endsAfter,
@@ -59,7 +59,8 @@ const mark = computed(() => {
     --mark-fill: color-mix(in oklch, var(--mark-color) 19%, var(--theme-color-default-background));
     --mark-end: color-mix(in oklch, var(--mark-color) 50%, var(--theme-color-default-background));
     display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--schedule-days), minmax(0, 1fr));
+    background: var(--theme-color-default-background);
     container-type: inline-size;
 }
 .schedule-track[data-tone='overdue'] {
@@ -76,27 +77,10 @@ const mark = computed(() => {
 .schedule-mark {
     grid-row: 1;
 }
-.schedule-cell {
-    background: color-mix(
-        in oklch,
-        var(--color-text-secondary) 3%,
-        var(--theme-color-default-background)
-    );
-}
-.schedule-cell:nth-child(n + 6) {
-    background: color-mix(
-        in oklch,
-        var(--color-text-secondary) 7%,
-        var(--theme-color-default-background)
-    );
+.schedule-cell:nth-child(7n + 1) {
+    border-inline-start: 1px solid var(--theme-color-default-background-separator);
 }
 .schedule-cell.today {
-    background: linear-gradient(
-        90deg,
-        color-mix(in oklch, #70b3cf 6%, var(--theme-color-default-background)),
-        color-mix(in oklch, #70b3cf 10%, var(--theme-color-default-background)),
-        color-mix(in oklch, #70b3cf 6%, var(--theme-color-default-background))
-    );
     position: relative;
 }
 .schedule-cell.today::after {
@@ -104,13 +88,13 @@ const mark = computed(() => {
     position: absolute;
     inset: 0 auto 0 50%;
     width: 1px;
-    background: #86b0c2;
+    background: color-mix(in oklch, #70b3cf 45%, transparent);
 }
 .schedule-mark {
     align-self: center;
     position: relative;
     height: 10px;
-    margin-inline: calc(100cqi / 14);
+    margin-inline: calc(100cqi / (2 * var(--schedule-days)));
     border-radius: 3px 0 0 3px;
     background: linear-gradient(90deg, var(--mark-fill), var(--mark-end));
 }

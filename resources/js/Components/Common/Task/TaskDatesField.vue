@@ -78,7 +78,11 @@ function clearTaskDates() {
                         Select a start date, then a due date.
                     </p>
                 </div>
-                <RangeCalendar v-model="draftDates" initial-focus :week-starts-on="weekStartsOn" />
+                <RangeCalendar
+                    v-model="draftDates"
+                    class="task-date-calendar"
+                    initial-focus
+                    :week-starts-on="weekStartsOn" />
                 <div class="flex items-center justify-between border-t border-border px-3 py-2.5">
                     <Button
                         type="button"
@@ -100,3 +104,22 @@ function clearTaskDates() {
         </Popover>
     </Field>
 </template>
+
+<style scoped>
+.task-date-calendar :deep([data-selection-start]),
+.task-date-calendar :deep([data-selection-end]) {
+    background-image: linear-gradient(var(--endpoint-color), var(--endpoint-color));
+    background-position: bottom;
+    background-size: 100% 3px;
+    background-repeat: no-repeat;
+}
+.task-date-calendar :deep([data-selection-start]) {
+    --endpoint-color: #0ea5e9;
+}
+.task-date-calendar :deep([data-selection-end]) {
+    --endpoint-color: #f59e0b;
+}
+.task-date-calendar :deep([data-selection-start][data-selection-end]) {
+    background-image: linear-gradient(90deg, #0ea5e9 50%, #f59e0b 50%);
+}
+</style>

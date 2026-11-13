@@ -34,6 +34,8 @@ class ProjectResource extends BaseResource
             'id' => $this->resource->id,
             /** Name of project */
             'name' => $this->resource->name,
+            /** When the project was created */
+            'created_at' => $this->formatDateTime($this->resource->created_at),
             /** Color of project */
             'color' => $this->resource->color,
             /** @var string|null $client_id ID of client */
