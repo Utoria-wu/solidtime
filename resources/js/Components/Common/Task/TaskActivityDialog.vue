@@ -12,11 +12,19 @@ import { formatHumanReadableDuration, getLocalizedDayJs } from '@/packages/ui/sr
 import { getCurrentMembershipId, getCurrentOrganizationId } from '@/utils/useUser';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 
-const props = defineProps<{ task: Task }>();
+const props = defineProps<{
+    task?: Task;
+    activity?: {
+        projectName: string;
+        projectColor: string;
+        dateLabel: string;
+        entries: TimeEntry[];
+    };
+}>();
 const open = defineModel<boolean>('open', { required: true });
 const organization = inject<ComputedRef<Organization>>('organization');
 const { projects } = useProjectsQuery();
-const project = computed(() => projects.value.find((item) => item.id === props.task.project_id));
+const project = computed(() => projects.value.find((item) => item.id === props.task?.project_id));
 const queryKey = computed(
     () =>
         [
@@ -24,16 +32,18 @@ const queryKey = computed(
             'task-activity',
             getCurrentOrganizationId(),
             getCurrentMembershipId(),
-            props.task.id,
+            props.task?.id,
         ] as const
 );
 const { data, isPending, isError, refetch } = useQuery({
     queryKey,
     enabled: computed(
-        () => open.value && Boolean(getCurrentOrganizationId() && getCurrentMembershipId())
+        () =>
+            open.value &&
+            Boolean(props.task && getCurrentOrganizationId() && getCurrentMembershipId())
     ),
     queryFn: async ({ queryKey: [, , organizationId, memberId, taskId], signal }) => {
-        if (!organizationId || !memberId) throw new Error('No membership');
+        if (!organizationId || !memberId || !taskId) throw new Error('No task or membership');
         const entries: TimeEntry[] = [];
         while (true) {
             const response = await api.getTimeEntries({
@@ -69,15 +79,23 @@ function renderNotes(notes: string | null | undefined) {
     );
 }
 const taskNotes = computed(() =>
-    typeof props.task.markdown_notes === 'string' && props.task.markdown_notes.trim()
+    typeof props.task?.markdown_notes === 'string' && props.task.markdown_notes.trim()
         ? renderNotes(props.task.markdown_notes)
         : ''
 );
 const entries = computed(() =>
-    [...(data.value ?? [])].reverse().map((entry) => {
+    (props.activity
+        ? [...props.activity.entries].sort(
+              (left, right) => Date.parse(left.start) - Date.parse(right.start)
+          )
+        : [...(data.value ?? [])].reverse()
+    ).map((entry) => {
         const start = getLocalizedDayJs(entry.start);
         const end = entry.end ? getLocalizedDayJs(entry.end) : null;
-        const query = new URLSearchParams({ date: start.format('YYYY-MM-DD'), entry: entry.id });
+        const query = new URLSearchParams({
+            date: start.format('YYYY-MM-DD'),
+            entry: entry.id,
+        });
         return {
             ...entry,
             startLabel: start.format('HH:mm'),
@@ -99,28 +117,32 @@ const total = computed(() => entries.value.reduce((sum, entry) => sum + (entry.d
                 <div class="flex items-center justify-between gap-3">
                     <div class="flex items-center gap-2 text-sm text-text-secondary">
                         <span
-                            v-if="project"
+                            v-if="project || activity"
                             class="size-2.5 rounded-full"
-                            :style="{ backgroundColor: project.color }" />
-                        {{ project?.name ?? 'Project' }}
+                            :style="{
+                                backgroundColor: activity?.projectColor ?? project?.color,
+                            }" />
+                        {{ activity?.projectName ?? project?.name ?? 'Project' }}
                     </div>
                     <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Close task details"
+                        :aria-label="activity ? 'Close activity' : 'Close task details'"
                         @click="open = false">
                         <XMarkIcon class="size-5" />
                     </Button>
                 </div>
                 <DialogTitle class="mt-2 text-xl font-semibold text-text-primary">{{
-                    task.name
+                    activity ? 'Activity' : task?.name
                 }}</DialogTitle>
                 <DialogDescription class="mt-3 flex items-center gap-3 text-xs text-text-secondary">
                     <span
+                        v-if="task"
                         class="rounded-md bg-secondary px-2 py-1 font-medium"
                         :class="{ 'text-green-600': task.is_done }"
                         >{{ task.is_done ? 'Done' : 'Active' }}</span
                     >
+                    <span v-if="activity">{{ activity.dateLabel }}</span>
                     <span v-if="data">{{ duration(total) }} tracked</span>
                 </DialogDescription>
             </header>
@@ -135,23 +157,32 @@ const total = computed(() => entries.value.reduce((sum, entry) => sum + (entry.d
                 </section>
                 <section aria-label="Activity">
                     <div class="flex items-center justify-between gap-3">
-                        <h3 class="text-sm font-semibold">Activity</h3>
-                        <span v-if="data" class="text-xs text-text-secondary"
+                        <h3 v-if="!activity" class="text-sm font-semibold">Activity</h3>
+                        <span v-if="activity || data" class="text-xs text-text-secondary"
                             >{{ entries.length }}
                             {{ entries.length === 1 ? 'time entry' : 'time entries' }}</span
                         >
                     </div>
-                    <div v-if="isPending" class="flex justify-center py-8"><LoadingSpinner /></div>
-                    <div v-else-if="isError" class="py-4 text-sm text-text-secondary" role="alert">
+                    <div v-if="!activity && isPending" class="flex justify-center py-8">
+                        <LoadingSpinner />
+                    </div>
+                    <div
+                        v-else-if="!activity && isError"
+                        class="py-4 text-sm text-text-secondary"
+                        role="alert">
                         Could not load time entries.
                         <Button variant="ghost" size="sm" @click="refetch()">Retry</Button>
                     </div>
                     <p v-else-if="!entries.length" class="py-4 text-sm text-text-secondary">
-                        You have no time entries linked to this task.
+                        {{
+                            activity
+                                ? 'You have no time entries for this project on this day.'
+                                : 'You have no time entries linked to this task.'
+                        }}
                     </p>
                     <template v-for="(entry, index) in entries" :key="entry.id">
                         <p
-                            v-if="entry.day !== entries[index - 1]?.day"
+                            v-if="!activity && entry.day !== entries[index - 1]?.day"
                             class="mb-2 mt-4 text-xs font-medium text-text-secondary">
                             {{ entry.day }}
                         </p>
