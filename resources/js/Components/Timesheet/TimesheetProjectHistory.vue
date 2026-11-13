@@ -33,7 +33,7 @@ const emit = defineEmits<{
 }>();
 
 const dayjs = getDayJsInstance();
-const anchor = shallowRef(props.view === 'months' ? dayjs(props.todayDate) : props.weekStart);
+const anchor = shallowRef(props.view === 'weeks' ? props.weekStart : dayjs(props.todayDate));
 const monthScope = ref(false);
 const activityOpen = ref(false);
 const activity = shallowRef<{
@@ -54,6 +54,15 @@ function startOfWeek(date: Dayjs) {
 }
 
 const periods = computed(() => {
+    if (props.view === 'year') {
+        const month = anchor.value.startOf('month');
+        const first = month.subtract(month.month() % 3, 'month');
+        const end = first.add(3, 'month');
+        return Array.from({ length: end.diff(first, 'day') }, (_, index) => {
+            const start = first.add(index, 'day');
+            return { start, end: start.add(1, 'day'), week: null };
+        });
+    }
     if (props.view === 'months') {
         const monthStart = anchor.value.startOf('month');
         return Array.from({ length: monthStart.daysInMonth() }, (_, index) => {
@@ -98,6 +107,16 @@ const range = computed(() => ({ start: periods.value[0]!.start, end: periods.val
 const rangeLabel = computed(() =>
     getDateRangeLabel(range.value.start, range.value.end.subtract(1, 'day'))
 );
+const dates = computed(() =>
+    periods.value.map(({ start }) => ({
+        key: start.format('YYYY-MM-DD'),
+        label: start.format('ddd, MMM D, YYYY'),
+    }))
+);
+const dayIndexes = computed(() => new Map(dates.value.map((date, index) => [date.key, index])));
+const projectsById = computed(
+    () => new Map(props.projects.map((project) => [project.id, project]))
+);
 const queryKey = computed(
     () =>
         [
@@ -127,13 +146,16 @@ const rows = computed(() => {
     for (const entry of data.value?.data ?? []) {
         if (entry.type === 'break') continue;
         const date = getLocalizedDateFromTimestamp(entry.start);
-        const index = boundaries.findIndex(([start, end]) => date >= start! && date < end!);
+        const index =
+            props.view === 'weeks'
+                ? boundaries.findIndex(([start, end]) => date >= start! && date < end!)
+                : (dayIndexes.value.get(date) ?? -1);
         if (index === -1) continue;
         const seconds =
             entry.end === null
                 ? Math.max(0, (props.now ?? dayjs.utc()).diff(dayjs.utc(entry.start), 'second'))
                 : (entry.duration ?? 0);
-        if (seconds <= 0 && props.view !== 'months') continue;
+        if (seconds <= 0 && props.view === 'weeks') continue;
         const project = byProject.get(entry.project_id) ?? {
             values: periods.value.map(() => 0),
             entries: periods.value.map(() => []),
@@ -143,7 +165,7 @@ const rows = computed(() => {
         byProject.set(entry.project_id, project);
     }
     return Array.from(byProject, ([id, { values, entries }]) => {
-        const project = props.projects.find((project) => project.id === id);
+        const project = id === null ? undefined : projectsById.value.get(id);
         return {
             id,
             name: project?.name ?? (id === null ? 'No project' : 'Unknown project'),
@@ -175,7 +197,7 @@ function isCurrentPeriod(start: Dayjs, end: Dayjs) {
 }
 
 function navigate(direction: number) {
-    if (props.view === 'year') anchor.value = anchor.value.add(direction, 'year');
+    if (props.view === 'year') anchor.value = anchor.value.add(direction * 3, 'month');
     else if (monthScope.value) anchor.value = anchor.value.add(direction, 'month');
     else if (props.view === 'months') anchor.value = anchor.value.add(direction, 'month');
     else anchor.value = anchor.value.add(direction * 12, 'week');
@@ -186,7 +208,7 @@ function selectPeriod(
     row: (typeof rows.value)[number],
     index: number
 ) {
-    if (props.view === 'months') {
+    if (props.view !== 'weeks') {
         activity.value = {
             projectName: row.name,
             projectColor: row.color,
@@ -235,6 +257,61 @@ function selectPeriod(
     <div v-else-if="!rows.length" class="px-6 py-12 text-center text-sm text-text-secondary">
         No project hours in this period.
     </div>
+    <div v-else-if="view === 'year'" class="overflow-x-auto px-2 sm:px-4 lg:px-6">
+        <div
+            class="min-w-[44rem] divide-y divide-default-background-separator rounded-xl border border-default-background-separator bg-card-background">
+            <section v-for="row in rows" :key="row.id ?? 'no-project'" class="px-4 py-4">
+                <div class="mb-3 flex items-center justify-between gap-3 text-sm">
+                    <h3 class="flex items-center gap-2 font-medium">
+                        <span
+                            class="size-2.5 rounded-full"
+                            :style="{ backgroundColor: row.color }" />
+                        {{ row.name }}
+                    </h3>
+                    <span class="tabular-nums text-text-secondary">{{
+                        displayDuration(row.total)
+                    }}</span>
+                </div>
+                <div
+                    class="grid gap-0.5"
+                    :style="{
+                        gridTemplateColumns: 'repeat(' + dates.length + ', minmax(0, 1fr))',
+                    }">
+                    <button
+                        v-for="(date, index) in dates"
+                        :key="date.key"
+                        type="button"
+                        class="h-5 rounded-sm bg-secondary hover:ring-1 focus-visible:ring-2 ring-ring"
+                        :style="
+                            row.values[index]
+                                ? {
+                                      backgroundColor: row.color,
+                                      opacity: 0.48 + (0.52 * row.values[index]!) / max,
+                                  }
+                                : undefined
+                        "
+                        :aria-current="date.key === todayDate ? 'date' : undefined"
+                        :aria-label="
+                            row.name +
+                            ', ' +
+                            date.label +
+                            ', ' +
+                            (row.values[index]
+                                ? displayDuration(row.values[index]!)
+                                : 'No tracked time')
+                        "
+                        :title="
+                            date.label +
+                            ' · ' +
+                            (row.values[index]
+                                ? displayDuration(row.values[index]!)
+                                : 'No tracked time')
+                        "
+                        @click="selectPeriod(periods[index]!, row, index)" />
+                </div>
+            </section>
+        </div>
+    </div>
     <div v-else class="overflow-x-auto max-w-[100vw]">
         <table
             class="w-full border-y border-default-background-separator text-sm"
@@ -257,11 +334,7 @@ function selectPeriod(
                         "
                         :class="{ 'bg-secondary': isCurrentPeriod(period.start, period.end) }"
                         class="px-1 py-2 text-center font-medium whitespace-nowrap">
-                        {{
-                            period.start.format(
-                                view === 'weeks' ? 'MMM D' : view === 'year' ? 'MMM' : 'D'
-                            )
-                        }}
+                        {{ period.start.format(view === 'weeks' ? 'MMM D' : 'D') }}
                     </th>
                     <th scope="col" class="px-4 py-2 text-right font-medium">Total</th>
                 </tr>
