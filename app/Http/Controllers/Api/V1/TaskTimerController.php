@@ -110,8 +110,10 @@ class TaskTimerController extends Controller
                     $session->segments = [...$session->segments, [
                         'start' => $session->started_at->timestamp,
                         'end' => $now->timestamp,
+                        'markdown_notes' => $action === 'pause' ? ($input['markdown_notes'] ?? null) : null,
                     ]];
                 }
+                abort_if($action === 'pause' && $now->lte($session->started_at) && isset($input['markdown_notes']), 422, 'Let the timer run for at least one second before saving notes.');
                 $session->started_at = null;
             }
 
@@ -159,7 +161,14 @@ class TaskTimerController extends Controller
             $entry->task()->associate($task);
             $entry->client()->associate($project->client_id);
             $entry->description = $description;
-            $entry->markdown_notes = $markdownNotes;
+            $segmentNotes = $segment['markdown_notes'] ?? null;
+            $notes = match (true) {
+                $segmentNotes === null => $markdownNotes,
+                $markdownNotes === null => $segmentNotes,
+                default => $segmentNotes."\n\n".$markdownNotes,
+            };
+            abort_if($notes !== null && mb_strlen($notes) > 10000, 422, 'Pause and completion notes together must be at most 10,000 characters.');
+            $entry->markdown_notes = $notes;
             $entry->start = $start;
             $entry->end = $end;
             $entry->billable = $billable;

@@ -7,6 +7,8 @@ import TabBar from '../TabBar/TabBar.vue';
 import TabBarItem from '../TabBar/TabBarItem.vue';
 import { Field, FieldLabel } from '../field';
 
+withDefaults(defineProps<{ label?: string }>(), { label: 'Notes' });
+
 const notes = defineModel<string | null>();
 const inputId = useId();
 const draft = computed({
@@ -28,7 +30,7 @@ const renderedNotes = computed(() =>
 <template>
     <Field>
         <div class="flex items-center justify-between gap-4">
-            <FieldLabel :for="inputId">Notes</FieldLabel>
+            <FieldLabel :for="inputId">{{ label }}</FieldLabel>
             <div class="shrink-0">
                 <TabBar v-model="mode" default-value="write">
                     <TabBarItem value="write">Write</TabBarItem>

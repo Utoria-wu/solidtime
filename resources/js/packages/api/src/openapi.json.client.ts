@@ -711,6 +711,7 @@ const TaskResource = z
         is_done: z.boolean(),
         project_id: z.string(),
         start_date: z.union([z.string(), z.null()]).optional(),
+        markdown_notes: z.string().nullable().optional(),
         due_date: z.union([z.string(), z.null()]).optional(),
         estimated_time: z.union([z.number(), z.null()]),
         spent_time: z.number().int(),
@@ -723,6 +724,7 @@ const TaskStoreRequest = z
         name: z.string().min(1).max(255),
         project_id: z.string(),
         start_date: z.union([z.string(), z.null()]).optional(),
+        markdown_notes: z.string().nullable().optional(),
         due_date: z.union([z.string(), z.null()]).optional(),
         estimated_time: z.union([z.number(), z.null()]).optional(),
     })
@@ -732,6 +734,7 @@ const TaskUpdateRequest = z
         name: z.string().min(1).max(255),
         is_done: z.boolean().optional(),
         start_date: z.union([z.string(), z.null()]).optional(),
+        markdown_notes: z.string().nullable().optional(),
         due_date: z.union([z.string(), z.null()]).optional(),
         estimated_time: z.union([z.number(), z.null()]).optional(),
     })

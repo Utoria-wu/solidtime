@@ -31,9 +31,11 @@ class TaskResource extends BaseResource
             /** ID of the project */
             'project_id' => $this->resource->project_id,
             /** First day of the planned task range (YYYY-MM-DD) */
+            'markdown_notes' => $this->resource->markdown_notes,
             'start_date' => $this->resource->start_date?->toDateString(),
             /** Last day of the planned task range (YYYY-MM-DD) */
             'due_date' => $this->resource->due_date?->toDateString(),
+            'markdown_notes' => $this->resource->markdown_notes,
             /** Estimated time in seconds */
             'estimated_time' => $this->resource->estimated_time,
             /** Spent time on this task in seconds (sum of the duration of all associated time entries, excl. still running time entries) */

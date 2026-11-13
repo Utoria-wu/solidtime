@@ -39,6 +39,7 @@ class TaskUpdateRequest extends BaseFormRequest
                 'boolean',
             ],
             // Both dates must be sent together. Send both as null to clear them.
+            'markdown_notes' => ['nullable', 'string', 'max:10000'],
             'start_date' => ['present_with:due_date', 'required_with:due_date', 'nullable', 'date_format:Y-m-d'],
             'due_date' => ['present_with:start_date', 'required_with:start_date', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             // Estimated time in seconds
