@@ -266,7 +266,9 @@ const showBillableRate = computed(() => {
                 <label
                     v-if="projectView === 'schedule'"
                     class="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-text-secondary">
-                    <Checkbox v-model:checked="showDoneTasks" />
+                    <Checkbox
+                        v-model:checked="showDoneTasks"
+                        class="focus:ring-0 focus-visible:ring-2 focus-visible:ring-ring/50" />
                     Show completed tasks
                 </label>
             </div>

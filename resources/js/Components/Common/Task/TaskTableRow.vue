@@ -181,6 +181,7 @@ const showTaskEditModal = ref(false);
             <span v-else class="text-text-tertiary">—</span>
         </div>
         <div
+            v-if="!$slots.timeline"
             class="whitespace-nowrap px-3 py-4 text-sm text-text-secondary flex space-x-1 items-center font-medium">
             <span v-if="task.spent_time">
                 {{

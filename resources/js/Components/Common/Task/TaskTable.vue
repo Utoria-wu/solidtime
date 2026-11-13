@@ -94,6 +94,7 @@ const view = ref<'list' | 'schedule'>(props.initialView ?? 'list');
 const showSchedule = computed(
     () => !!props.scheduleProjects || (props.allowSchedule && view.value === 'schedule')
 );
+const scheduleDays = 14;
 const weekOffset = ref(0);
 const today = computed(() =>
     getLocalizedDayJs(new Date(timestamp.value).toISOString()).format('YYYY-MM-DD')
@@ -101,12 +102,14 @@ const today = computed(() =>
 const days = computed(() => {
     const date = getDayJsInstance()(today.value);
     const monday = date.subtract((date.day() + 6) % 7, 'day').add(weekOffset.value, 'week');
-    return Array.from({ length: 7 }, (_, index) => monday.add(index, 'day'));
+    return Array.from({ length: scheduleDays }, (_, index) => monday.add(index, 'day'));
 });
 const weekDates = computed(() => days.value.map((day) => day.format('YYYY-MM-DD')));
-const weekLabel = computed(
-    () => `${days.value[0]!.format('MMM D')} – ${days.value[6]!.format('MMM D, YYYY')}`
-);
+const weekLabel = computed(() => {
+    const first = days.value[0]!;
+    const last = days.value[scheduleDays - 1]!;
+    return `${first.format(first.year() === last.year() ? 'MMM D' : 'MMM D, YYYY')} – ${last.format('MMM D, YYYY')}`;
+});
 const groups = [
     { id: 'overdue', label: 'Overdue' },
     { id: 'ready', label: 'Ready to work' },
@@ -192,8 +195,9 @@ const rowGroups = computed(() => {
                 :class="{ 'schedule-table': showSchedule }"
                 :style="{
                     gridTemplateColumns: showSchedule
-                        ? 'minmax(12rem, 1fr) 6rem 6rem 7rem minmax(28rem, 2fr)'
+                        ? 'minmax(13rem, 1fr) 5rem 7rem minmax(34rem, 2.5fr)'
                         : 'minmax(10rem, 1fr) repeat(2, minmax(7.5rem, max-content)) 11rem minmax(80px, auto) minmax(95px, auto) 8rem 8rem',
+                    '--schedule-days': scheduleDays,
                 }">
                 <TaskTableHeading
                     v-if="!showSchedule"
@@ -203,18 +207,21 @@ const rowGroups = computed(() => {
                     @sort="handleSort"></TaskTableHeading>
                 <div v-else role="row" class="contents text-xs text-text-secondary">
                     <div role="columnheader" class="px-4 py-3">Task / Planned dates</div>
-                    <div role="columnheader" class="px-3 py-3">Tracked</div>
                     <div role="columnheader" class="px-3 py-3">Timer</div>
                     <div role="columnheader"><span class="sr-only">Actions</span></div>
-                    <div role="columnheader" aria-label="Weekly timeline" class="schedule-days">
+                    <div role="columnheader" aria-label="Two-week timeline" class="schedule-days">
                         <div
                             v-for="(day, index) in days"
                             :key="weekDates[index]"
                             class="schedule-day flex flex-col items-center justify-center gap-0.5 py-2"
                             :class="{ 'schedule-today': weekDates[index] === today }"
-                            :aria-current="weekDates[index] === today ? 'date' : undefined">
-                            {{ day.format('ddd') }}
-                            <strong class="text-sm text-text-primary">{{ day.format('D') }}</strong>
+                            :aria-current="weekDates[index] === today ? 'date' : undefined"
+                            :title="day.format('dddd, MMM D, YYYY')">
+                            {{ day.format('dd') }}
+                            <strong
+                                class="schedule-date flex size-6 items-center justify-center rounded-md text-sm text-text-primary"
+                                >{{ day.format('D') }}</strong
+                            >
                         </div>
                     </div>
                 </div>
@@ -235,7 +242,7 @@ const rowGroups = computed(() => {
                     <div v-if="showSchedule" role="row" class="contents">
                         <div
                             role="cell"
-                            class="col-span-4 bg-tertiary px-4 py-2 text-xs font-semibold">
+                            class="col-span-3 bg-tertiary px-4 py-2 text-xs font-semibold">
                             {{ group.label }}
                             <span class="ml-1 text-text-secondary">{{ group.tasks.length }}</span>
                         </div>
@@ -263,6 +270,11 @@ const rowGroups = computed(() => {
                                     >No dates set</template
                                 >
                                 <span v-if="scheduleProjects && task.is_done"> · Done</span>
+                                <span
+                                    v-else-if="taskGroup(task) === 'overdue'"
+                                    class="text-red-500">
+                                    · Overdue</span
+                                >
                             </span>
                         </template>
                         <template v-if="showSchedule" #timeline>
@@ -287,23 +299,12 @@ const rowGroups = computed(() => {
 }
 .schedule-days {
     display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--schedule-days), minmax(0, 1fr));
 }
-.schedule-day {
-    background: color-mix(
-        in oklch,
-        var(--color-text-secondary) 3%,
-        var(--theme-color-default-background)
-    );
+.schedule-day:nth-child(7n + 1) {
+    border-inline-start: 1px solid var(--theme-color-default-background-separator);
 }
-.schedule-day:nth-child(n + 6) {
-    background: color-mix(
-        in oklch,
-        var(--color-text-secondary) 7%,
-        var(--theme-color-default-background)
-    );
-}
-.schedule-day.schedule-today {
-    background: color-mix(in oklch, #70b3cf 8%, var(--theme-color-default-background));
+.schedule-today .schedule-date {
+    background: color-mix(in oklch, #70b3cf 20%, var(--theme-color-default-background));
 }
 </style>
