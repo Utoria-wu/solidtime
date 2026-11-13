@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 import { useBillableRatesLock } from '@/packages/ui/src/utils/useBillableRatesLock';
 import TagBadge from '@/packages/ui/src/Tag/TagBadge.vue';
 import { useTagsQuery } from '@/utils/useTagsQuery';
@@ -93,6 +94,7 @@ const billableRateInfo = computed(() => {
 const showEditProjectModal = ref(false);
 
 const { locked: billableRatesLocked } = useBillableRatesLock();
+const { t } = useInterfaceLanguage();
 </script>
 
 <template>
@@ -157,7 +159,7 @@ const { locked: billableRatesLocked } = useBillableRatesLock();
                     <div v-if="project.client_id" class="max-w-48 truncate" :title="client?.name">
                         {{ client?.name }}
                     </div>
-                    <div v-else class="text-text-tertiary">No client</div>
+                    <div v-else class="text-text-tertiary">{{ t('No client') }}</div>
                 </div>
                 <div
                     class="whitespace-nowrap px-3 py-4 flex items-center text-sm text-text-primary">
@@ -193,22 +195,22 @@ const { locked: billableRatesLocked } = useBillableRatesLock();
                     class="whitespace-nowrap px-3 py-4 text-sm text-text-primary flex space-x-1.5 items-center font-medium">
                     <template v-if="project.is_archived">
                         <ArchiveBoxIcon class="w-4 text-icon-default"></ArchiveBoxIcon>
-                        <span>Archived</span>
+                        <span>{{ t('Archived') }}</span>
                     </template>
                     <template v-else>
                         <CheckCircleIcon class="w-4 text-icon-default"></CheckCircleIcon>
-                        <span>Active</span>
+                        <span>{{ t('Active') }}</span>
                     </template>
                 </div>
                 <div
                     class="whitespace-nowrap px-3 py-4 text-sm text-text-primary flex space-x-1.5 items-center font-medium">
                     <template v-if="project.is_public">
                         <GlobeAltIcon class="w-4 text-icon-default"></GlobeAltIcon>
-                        <span>Public</span>
+                        <span>{{ t('Public') }}</span>
                     </template>
                     <template v-else>
                         <LockClosedIcon class="w-4 text-icon-default"></LockClosedIcon>
-                        <span>Private</span>
+                        <span>{{ t('Private') }}</span>
                     </template>
                 </div>
                 <div

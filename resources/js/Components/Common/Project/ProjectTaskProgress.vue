@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 import { computed } from 'vue';
 import type { Task } from '@/packages/api/src';
 
@@ -14,12 +15,13 @@ const percentage = computed(() => (total.value === 0 ? 0 : (completed.value / to
 const description = computed(
     () => `${completed.value} completed, ${total.value - completed.value} remaining`
 );
+const { t } = useInterfaceLanguage();
 </script>
 
 <template>
     <span v-if="isLoading" class="text-text-secondary text-xs">Loading tasks…</span>
     <span v-else-if="isError" class="text-text-secondary text-xs">Tasks unavailable</span>
-    <span v-else-if="total === 0" class="text-text-tertiary text-xs">No tasks</span>
+    <span v-else-if="total === 0" class="text-text-tertiary text-xs">{{ t('No tasks') }}</span>
     <div v-else class="w-full" :title="description">
         <div
             role="progressbar"
@@ -36,7 +38,7 @@ const description = computed(
         </div>
         <div
             class="text-xs font-semibold pt-1.5 flex items-center justify-between gap-2 tabular-nums">
-            <span>{{ completed }} / {{ total }} Done</span>
+            <span>{{ completed }} / {{ total }} {{ t('Done') }}</span>
             <span>{{ Math.round(percentage) }}%</span>
         </div>
     </div>

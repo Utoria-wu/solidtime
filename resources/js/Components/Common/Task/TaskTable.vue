@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import { PlusCircleIcon } from '@heroicons/vue/24/solid';
 import { PlusIcon } from '@heroicons/vue/16/solid';
@@ -156,6 +157,7 @@ const rowGroups = computed(() => {
         }))
         .filter((group) => group.tasks.length);
 });
+const { t } = useInterfaceLanguage();
 </script>
 
 <template>
@@ -176,11 +178,11 @@ const rowGroups = computed(() => {
                 :aria-pressed="view === option"
                 class="rounded-md px-3 py-1.5 text-sm capitalize text-text-secondary aria-pressed:bg-default-background aria-pressed:text-text-primary aria-pressed:shadow-sm"
                 @click="view = option">
-                {{ option }}
+                {{ t(option === 'list' ? 'List' : 'Schedule') }}
             </button>
         </div>
         <div v-if="showSchedule" class="ml-auto flex items-center gap-2 text-sm">
-            <SecondaryButton @click="weekOffset = 0">Today</SecondaryButton>
+            <SecondaryButton @click="weekOffset = 0">{{ t('Today') }}</SecondaryButton>
             <SecondaryButton aria-label="Previous week" @click="weekOffset--">‹</SecondaryButton>
             <span class="min-w-40 text-center font-medium" aria-live="polite">{{ weekLabel }}</span>
             <SecondaryButton aria-label="Next week" @click="weekOffset++">›</SecondaryButton>
@@ -206,8 +208,8 @@ const rowGroups = computed(() => {
                     :desc-first-columns="descFirstColumns"
                     @sort="handleSort"></TaskTableHeading>
                 <div v-else role="row" class="contents text-xs text-text-secondary">
-                    <div role="columnheader" class="px-4 py-3">Task / Planned dates</div>
-                    <div role="columnheader" class="px-3 py-3">Timer</div>
+                    <div role="columnheader" class="px-4 py-3">{{ t('Task / Planned dates') }}</div>
+                    <div role="columnheader" class="px-3 py-3">{{ t('Timer') }}</div>
                     <div role="columnheader"><span class="sr-only">Actions</span></div>
                     <div role="columnheader" aria-label="Two-week timeline" class="schedule-days">
                         <div
@@ -227,7 +229,7 @@ const rowGroups = computed(() => {
                 </div>
                 <div v-if="sortedTasks.length === 0" class="col-span-full py-24 text-center">
                     <PlusCircleIcon class="w-8 text-icon-default inline pb-2"></PlusCircleIcon>
-                    <h3 class="text-text-primary font-semibold">No tasks found</h3>
+                    <h3 class="text-text-primary font-semibold">{{ t('No tasks found') }}</h3>
                     <p v-if="projectId && canCreateTasks()" class="pb-5">
                         Create your first task now!
                     </p>
@@ -243,7 +245,7 @@ const rowGroups = computed(() => {
                         <div
                             role="cell"
                             class="col-span-3 bg-tertiary px-4 py-2 text-xs font-semibold">
-                            {{ group.label }}
+                            {{ scheduleProjects ? group.label : t(group.label) }}
                             <span class="ml-1 text-text-secondary">{{ group.tasks.length }}</span>
                         </div>
                         <TaskScheduleTrack :dates="weekDates" :today="today" aria-hidden="true" />
@@ -266,10 +268,12 @@ const rowGroups = computed(() => {
                                     {{ task.start_date ? ' → ' : 'Due '
                                     }}{{ getDayJsInstance()(task.due_date).format('MMM D, YYYY') }}
                                 </template>
-                                <template v-if="!task.start_date && !task.due_date"
-                                    >No dates set</template
+                                <template v-if="!task.start_date && !task.due_date">{{
+                                    t('No dates set')
+                                }}</template>
+                                <span v-if="scheduleProjects && task.is_done">
+                                    · {{ t('Done') }}</span
                                 >
-                                <span v-if="scheduleProjects && task.is_done"> · Done</span>
                                 <span
                                     v-else-if="taskGroup(task) === 'overdue'"
                                     class="text-red-500">

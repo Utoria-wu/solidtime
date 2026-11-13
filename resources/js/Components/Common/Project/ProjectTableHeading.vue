@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 import { computed } from 'vue';
 import TableHeading from '@/Components/Common/TableHeading.vue';
 import SortableTableHeaderCell from '@/Components/Common/SortableTableHeaderCell.vue';
@@ -25,6 +26,7 @@ const sortState = computed(() => ({
 function handleSort(column: SortColumn) {
     emit('sort', column);
 }
+const { t } = useInterfaceLanguage();
 </script>
 
 <template>
@@ -34,44 +36,44 @@ function handleSort(column: SortColumn) {
             column="name"
             v-bind="sortState"
             @sort="handleSort">
-            Name
+            {{ t('Name') }}
         </SortableTableHeaderCell>
         <SortableTableHeaderCell
             class="whitespace-nowrap"
             column="created_at"
             v-bind="sortState"
             @sort="handleSort">
-            Created
+            {{ t('Created') }}
         </SortableTableHeaderCell>
         <div
             data-testid="project_tasks_heading"
             class="px-3 py-1.5 text-left text-text-tertiary flex items-center">
-            Tasks
+            {{ t('Tasks') }}
         </div>
         <SortableTableHeaderCell column="client_name" v-bind="sortState" @sort="handleSort">
-            Client
+            {{ t('Client') }}
         </SortableTableHeaderCell>
         <SortableTableHeaderCell column="spent_time" v-bind="sortState" @sort="handleSort">
-            Total Time
+            {{ t('Total Time') }}
         </SortableTableHeaderCell>
         <SortableTableHeaderCell column="progress" v-bind="sortState" @sort="handleSort">
-            Progress
+            {{ t('Progress') }}
         </SortableTableHeaderCell>
         <SortableTableHeaderCell
             v-if="showBillableRate"
             column="billable_rate"
             v-bind="sortState"
             @sort="handleSort">
-            Billable Rate
+            {{ t('Billable Rate') }}
         </SortableTableHeaderCell>
         <SortableTableHeaderCell column="status" v-bind="sortState" @sort="handleSort">
-            Status
+            {{ t('Status') }}
         </SortableTableHeaderCell>
         <SortableTableHeaderCell column="visibility" v-bind="sortState" @sort="handleSort">
-            Visibility
+            {{ t('Visibility') }}
         </SortableTableHeaderCell>
         <div class="relative py-1.5 pl-3 pr-2 sm:pr-4 lg:pr-6">
-            <span class="sr-only">Edit</span>
+            <span class="sr-only">{{ t('Edit') }}</span>
         </div>
     </TableHeading>
 </template>

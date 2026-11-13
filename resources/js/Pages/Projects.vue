@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import MainContainer from '@/packages/ui/src/MainContainer.vue';
 import { FolderIcon, PlusIcon } from '@heroicons/vue/20/solid';
@@ -173,13 +174,14 @@ const showBillableRate = computed(() => {
         getCurrentRole() !== 'employee' || organization.value?.employees_can_see_billable_rates
     );
 });
+const { t } = useInterfaceLanguage();
 </script>
 
 <template>
-    <AppLayout title="Projects" data-testid="projects_view">
+    <AppLayout :title="t('Projects')" data-testid="projects_view">
         <MainContainer class="py-3 sm:pt-5 flex justify-between items-center">
             <div class="flex items-center space-x-3 sm:space-x-6">
-                <PageTitle :icon="FolderIcon" title="Projects"></PageTitle>
+                <PageTitle :icon="FolderIcon" :title="t('Projects')"></PageTitle>
                 <div
                     role="group"
                     aria-label="Projects view"
@@ -191,7 +193,7 @@ const showBillableRate = computed(() => {
                         :aria-pressed="projectView === view"
                         class="rounded-md px-3 py-1.5 text-sm capitalize text-text-secondary aria-pressed:bg-default-background aria-pressed:text-text-primary aria-pressed:shadow-sm"
                         @click="projectView = view">
-                        {{ view }}
+                        {{ t(view === 'list' ? 'List' : 'Schedule') }}
                     </button>
                 </div>
             </div>
@@ -199,7 +201,7 @@ const showBillableRate = computed(() => {
                 v-if="canCreateProjects()"
                 :icon="PlusIcon"
                 @click="showCreateProjectModal = true"
-                >Create Project
+                >{{ t('Create Project') }}
             </SecondaryButton>
             <ProjectCreateModal
                 v-model:show="showCreateProjectModal"
@@ -259,8 +261,8 @@ const showBillableRate = computed(() => {
                         v-model="search"
                         size="sm"
                         type="search"
-                        aria-label="Search projects"
-                        placeholder="Search projects..."
+                        :aria-label="t('Search projects')"
+                        :placeholder="t('Search projects...')"
                         class="w-60 border-transparent bg-transparent pl-7 shadow-none placeholder:text-text-tertiary hover:bg-black/5 focus-visible:bg-input-background dark:hover:bg-white/5 [&::-webkit-search-cancel-button]:hidden" />
                 </div>
                 <label
@@ -269,7 +271,7 @@ const showBillableRate = computed(() => {
                     <Checkbox
                         v-model:checked="showDoneTasks"
                         class="focus:ring-0 focus-visible:ring-2 focus-visible:ring-ring/50" />
-                    Show completed tasks
+                    {{ t('Show completed tasks') }}
                 </label>
             </div>
         </MainContainer>
@@ -285,13 +287,13 @@ const showBillableRate = computed(() => {
             @sort="handleSort"></ProjectTable>
         <MainContainer v-else class="pb-6">
             <p v-if="tasksError" role="alert" class="py-6 text-sm text-text-secondary">
-                Could not load tasks.
+                {{ t('Could not load tasks.') }}
             </p>
             <p
                 v-else-if="projectsLoading || tasksPending"
                 role="status"
                 class="py-6 text-sm text-text-secondary">
-                Loading schedule…
+                {{ t('Loading schedule…') }}
             </p>
             <TaskTable
                 v-else
