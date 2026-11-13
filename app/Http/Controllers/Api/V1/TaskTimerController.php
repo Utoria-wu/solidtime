@@ -117,7 +117,7 @@ class TaskTimerController extends Controller
                 $session->started_at = null;
             }
 
-            if ($action !== 'complete') {
+            if ($action === 'resume') {
                 $session->version++;
                 $session->save();
 
@@ -125,9 +125,17 @@ class TaskTimerController extends Controller
             }
 
             $description = $input['description'] ?? $task->name;
-            $count = $this->saveEntries($organization, $member, $project, $task, $session, $description, $input['markdown_notes'] ?? null);
-            // The Done list refreshes as soon as this transaction commits.
+            $count = $this->saveEntries($organization, $member, $project, $task, $session, $description, $action === 'complete' ? ($input['markdown_notes'] ?? null) : null);
             $task->setComputedAttributeValue('spent_time');
+            if ($action === 'pause') {
+                $task->save();
+                $session->segments = [];
+                $session->version++;
+                $session->save();
+
+                return $count;
+            }
+
             $task->done_at ??= $now;
             $task->save();
             $session->delete();

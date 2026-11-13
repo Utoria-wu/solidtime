@@ -713,11 +713,6 @@ class TimeEntryController extends Controller
             $client = $project?->client;
             $timeEntry->client()->associate($client);
         }
-        $task = null;
-        if ($request->has('task_id')) {
-            $task = $request->input('task_id') !== null ? Task::findOrFail((string) $request->input('task_id')) : null;
-        }
-
         $wasBillable = $timeEntry->billable;
         $timeEntry->fill($request->validated());
         // Organizations that can not use billable rates can keep or remove the billable flag, but not set it
@@ -734,19 +729,23 @@ class TimeEntryController extends Controller
         }
         $timeEntry->description = $request->input('description', $timeEntry->description) ?? '';
         $timeEntry->setComputedAttributeValue('billable_rate');
-        $timeEntry->save();
+        DB::transaction(function () use ($timeEntry, $oldTask): void {
+            $taskIds = array_filter([$oldTask?->id, $timeEntry->task_id]);
+            $affectedTasks = Task::query()->whereIn('id', $taskIds)->orderBy('id')->lockForUpdate()->get();
+            $timeEntry->save();
+            foreach ($affectedTasks as $affectedTask) {
+                $affectedTask->setComputedAttributeValue('spent_time');
+                if ($affectedTask->isDirty('spent_time')) {
+                    $affectedTask->save();
+                }
+            }
+        });
 
         if ($oldProject !== null) {
             RecalculateSpentTimeForProject::dispatch($oldProject);
         }
-        if ($oldTask !== null) {
-            RecalculateSpentTimeForTask::dispatch($oldTask);
-        }
         if ($project !== null && ($oldProject === null || $project->isNot($oldProject))) {
             RecalculateSpentTimeForProject::dispatch($project);
-        }
-        if ($task !== null && ($oldTask === null || $task->isNot($oldTask))) {
-            RecalculateSpentTimeForTask::dispatch($task);
         }
 
         return new TimeEntryResource($timeEntry);

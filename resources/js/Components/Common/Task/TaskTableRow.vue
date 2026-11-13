@@ -61,10 +61,7 @@ const timerAvailable = computed(
             (props.timer.started_at !== null && props.timer.version === pauseVersion.value))
 );
 const canSaveCompletion = computed(
-    () =>
-        !saving.value &&
-        timerAvailable.value &&
-        (dialogAction.value === 'pause' || eventName.value.trim().length > 0)
+    () => !saving.value && timerAvailable.value && eventName.value.trim().length > 0
 );
 
 function openCompletion() {
@@ -82,6 +79,7 @@ function handleTimerButton() {
 
     dialogAction.value = 'pause';
     pauseVersion.value = timer.version;
+    eventName.value = props.task.name;
     notes.value = null;
     completionTimerId.value = timer.id;
 }
@@ -89,7 +87,7 @@ function handleTimerButton() {
 function submitCompletion() {
     if (canSaveCompletion.value) {
         void changeTimer(dialogAction.value, {
-            description: dialogAction.value === 'complete' ? eventName.value.trim() : undefined,
+            description: eventName.value.trim(),
             markdown_notes: notes.value?.trim() ? notes.value : null,
         });
     }
@@ -272,7 +270,7 @@ const showTaskEditModal = ref(false);
                 dialogAction === 'pause' ? 'Pause task timer' : 'Save to Calendar'
             }}</template>
             <template #content>
-                <Field v-if="dialogAction === 'complete'">
+                <Field>
                     <FieldLabel :for="eventNameId">Event name</FieldLabel>
                     <TextInput
                         :id="eventNameId"
@@ -290,12 +288,10 @@ const showTaskEditModal = ref(false);
                         <TimeEntryNotesField v-model="notes" />
                     </fieldset>
                     <p v-if="dialogAction === 'pause'" class="mt-3">
-                        Record what you completed in this segment. The timer pauses when you
-                        confirm.
+                        Pausing saves this segment to Calendar and keeps the task active.
                     </p>
                     <p v-else class="mt-3">
-                        Completion notes are added to each time entry alongside any notes from its
-                        pause. Saving marks the task as Done.
+                        Saving logs any remaining timer segments and marks the task as Done.
                     </p>
                 </template>
                 <p v-else role="alert" class="mt-3">This timer is no longer available.</p>

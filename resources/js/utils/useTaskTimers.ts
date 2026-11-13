@@ -72,11 +72,14 @@ export function useTaskTimers() {
             const response = await notifications.handleApiRequestNotifications(() =>
                 axios.post<{ saved_entries: number }>(`${endpoint(organization)}/${taskId}`, body)
             );
-            if (action === 'complete' && response) {
+            if (
+                response &&
+                (action === 'complete' || (action === 'pause' && response.data.saved_entries > 0))
+            ) {
                 const count = response.data.saved_entries;
                 notifications.addNotification(
                     'success',
-                    'Task completed',
+                    action === 'pause' ? 'Timer paused' : 'Task completed',
                     count === 1
                         ? '1 time entry saved to Calendar.'
                         : `${count} time entries saved to Calendar.`

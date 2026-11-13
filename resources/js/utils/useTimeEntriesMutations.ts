@@ -60,6 +60,7 @@ export function useTimeEntriesMutations() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['timeEntries'] });
             queryClient.invalidateQueries({ queryKey: ['goals'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
         },
     });
 
