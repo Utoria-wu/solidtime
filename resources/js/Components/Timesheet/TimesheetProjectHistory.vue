@@ -2,7 +2,8 @@
 import { computed, shallowRef, ref, watch } from 'vue';
 import { useQuery } from '@tanstack/vue-query';
 import type { Dayjs } from 'dayjs';
-import type { Project } from '@/packages/api/src';
+import type { Project, TimeEntry } from '@/packages/api/src';
+import TaskActivityDialog from '@/Components/Common/Task/TaskActivityDialog.vue';
 import { Button } from '@/packages/ui/src/Buttons';
 import DateRangeNavigator from '@/packages/ui/src/Input/DateRangeNavigator.vue';
 import LoadingSpinner from '@/packages/ui/src/LoadingSpinner.vue';
@@ -32,8 +33,15 @@ const emit = defineEmits<{
 }>();
 
 const dayjs = getDayJsInstance();
-const anchor = shallowRef(props.weekStart);
+const anchor = shallowRef(props.view === 'months' ? dayjs(props.todayDate) : props.weekStart);
 const monthScope = ref(false);
+const activityOpen = ref(false);
+const activity = shallowRef<{
+    projectName: string;
+    projectColor: string;
+    dateLabel: string;
+    entries: TimeEntry[];
+}>();
 watch(
     () => props.view,
     (view) => {
@@ -46,6 +54,13 @@ function startOfWeek(date: Dayjs) {
 }
 
 const periods = computed(() => {
+    if (props.view === 'months') {
+        const monthStart = anchor.value.startOf('month');
+        return Array.from({ length: monthStart.daysInMonth() }, (_, index) => {
+            const start = monthStart.add(index, 'day');
+            return { start, end: start.add(1, 'day'), week: null };
+        });
+    }
     if (props.view === 'weeks') {
         if (!monthScope.value) {
             const first = startOfWeek(anchor.value).subtract(11, 'week');
@@ -72,10 +87,7 @@ const periods = computed(() => {
         return result;
     }
 
-    const first =
-        props.view === 'year'
-            ? anchor.value.startOf('year')
-            : anchor.value.startOf('month').subtract(11, 'month');
+    const first = anchor.value.startOf('year');
     return Array.from({ length: 12 }, (_, index) => {
         const start = first.add(index, 'month');
         return { start, end: start.add(1, 'month'), week: null };
@@ -107,7 +119,7 @@ const { data, isPending, isError, refetch } = useQuery({
 });
 
 const rows = computed(() => {
-    const byProject = new Map<string | null, number[]>();
+    const byProject = new Map<string | null, { values: number[]; entries: TimeEntry[][] }>();
     const boundaries = periods.value.map(({ start, end }) => [
         start.format('YYYY-MM-DD'),
         end.format('YYYY-MM-DD'),
@@ -121,18 +133,23 @@ const rows = computed(() => {
             entry.end === null
                 ? Math.max(0, (props.now ?? dayjs.utc()).diff(dayjs.utc(entry.start), 'second'))
                 : (entry.duration ?? 0);
-        if (seconds <= 0) continue;
-        const values = byProject.get(entry.project_id) ?? periods.value.map(() => 0);
-        values[index] = (values[index] ?? 0) + seconds;
-        byProject.set(entry.project_id, values);
+        if (seconds <= 0 && props.view !== 'months') continue;
+        const project = byProject.get(entry.project_id) ?? {
+            values: periods.value.map(() => 0),
+            entries: periods.value.map(() => []),
+        };
+        project.values[index]! += Math.max(0, seconds);
+        project.entries[index]!.push(entry);
+        byProject.set(entry.project_id, project);
     }
-    return Array.from(byProject, ([id, values]) => {
+    return Array.from(byProject, ([id, { values, entries }]) => {
         const project = props.projects.find((project) => project.id === id);
         return {
             id,
             name: project?.name ?? (id === null ? 'No project' : 'Unknown project'),
             color: project?.color ?? '#64748b',
             values,
+            entries,
             total: values.reduce((sum, seconds) => sum + seconds, 0),
         };
     }).sort((a, b) => a.name.localeCompare(b.name));
@@ -160,13 +177,27 @@ function isCurrentPeriod(start: Dayjs, end: Dayjs) {
 function navigate(direction: number) {
     if (props.view === 'year') anchor.value = anchor.value.add(direction, 'year');
     else if (monthScope.value) anchor.value = anchor.value.add(direction, 'month');
-    else if (props.view === 'months') anchor.value = anchor.value.add(direction * 12, 'month');
+    else if (props.view === 'months') anchor.value = anchor.value.add(direction, 'month');
     else anchor.value = anchor.value.add(direction * 12, 'week');
 }
 
-function selectPeriod(period: (typeof periods.value)[number], projectId: string | null) {
+function selectPeriod(
+    period: (typeof periods.value)[number],
+    row: (typeof rows.value)[number],
+    index: number
+) {
+    if (props.view === 'months') {
+        activity.value = {
+            projectName: row.name,
+            projectColor: row.color,
+            dateLabel: period.start.format('dddd, MMM D, YYYY'),
+            entries: row.entries[index] ?? [],
+        };
+        activityOpen.value = true;
+        return;
+    }
     if (period.week) {
-        emit('week', period.week, projectId);
+        emit('week', period.week, row.id);
         return;
     }
     anchor.value = period.start;
@@ -176,6 +207,7 @@ function selectPeriod(period: (typeof periods.value)[number], projectId: string 
 </script>
 
 <template>
+    <TaskActivityDialog v-if="activity" v-model:open="activityOpen" :activity="activity" />
     <div class="flex flex-wrap items-center justify-between gap-4 mb-4 px-2 sm:px-4 lg:px-6">
         <div class="flex flex-wrap items-center gap-3">
             <DateRangeNavigator
@@ -212,6 +244,7 @@ function selectPeriod(period: (typeof periods.value)[number], projectId: string 
                     <th
                         scope="col"
                         class="px-4 py-2 text-left font-medium"
+                        :class="{ 'sticky left-0 z-10 bg-background': view === 'months' }"
                         style="min-width: 13rem">
                         Project
                     </th>
@@ -226,7 +259,7 @@ function selectPeriod(period: (typeof periods.value)[number], projectId: string 
                         class="px-1 py-2 text-center font-medium whitespace-nowrap">
                         {{
                             period.start.format(
-                                view === 'weeks' ? 'MMM D' : view === 'year' ? 'MMM' : 'MMM [’]YY'
+                                view === 'weeks' ? 'MMM D' : view === 'year' ? 'MMM' : 'D'
                             )
                         }}
                     </th>
@@ -238,7 +271,10 @@ function selectPeriod(period: (typeof periods.value)[number], projectId: string 
                     v-for="row in rows"
                     :key="row.id ?? 'no-project'"
                     class="border-t border-default-background-separator">
-                    <th scope="row" class="px-4 py-3 text-left font-medium">
+                    <th
+                        scope="row"
+                        class="px-4 py-3 text-left font-medium"
+                        :class="{ 'sticky left-0 z-10 bg-default-background': view === 'months' }">
                         <span class="flex items-center gap-2">
                             <span
                                 class="size-2.5 shrink-0 rounded-full"
@@ -252,26 +288,33 @@ function selectPeriod(period: (typeof periods.value)[number], projectId: string 
                         class="px-0.5 py-2 text-center"
                         style="min-width: 4.2rem">
                         <button
-                            v-if="row.values[index]"
+                            v-if="view === 'months' || row.values[index]"
                             type="button"
                             class="w-full rounded-sm py-1 text-xs font-medium tabular-nums hover:ring-1 focus-visible:ring-2 ring-ring"
-                            :style="{
-                                backgroundColor:
-                                    'color-mix(in srgb, ' +
-                                    row.color +
-                                    ' ' +
-                                    (16 + (24 * row.values[index]!) / max) +
-                                    '%, transparent)',
-                            }"
+                            :class="{ 'bg-background text-text-tertiary': !row.values[index] }"
+                            :style="
+                                row.values[index]
+                                    ? {
+                                          backgroundColor:
+                                              'color-mix(in srgb, ' +
+                                              row.color +
+                                              ' ' +
+                                              (16 + (24 * row.values[index]!) / max) +
+                                              '%, transparent)',
+                                      }
+                                    : undefined
+                            "
                             :aria-label="
                                 row.name +
                                 ', ' +
                                 getDateRangeLabel(period.start, period.end.subtract(1, 'day')) +
                                 ', ' +
-                                displayDuration(row.values[index]!)
+                                (row.values[index]
+                                    ? displayDuration(row.values[index]!)
+                                    : 'No tracked time')
                             "
-                            @click="selectPeriod(period, row.id)">
-                            {{ displayDuration(row.values[index]!) }}
+                            @click="selectPeriod(period, row, index)">
+                            {{ row.values[index] ? displayDuration(row.values[index]!) : '—' }}
                         </button>
                         <span
                             v-else
@@ -287,7 +330,12 @@ function selectPeriod(period: (typeof periods.value)[number], projectId: string 
             </tbody>
             <tfoot class="border-t border-default-background-separator bg-background text-xs">
                 <tr>
-                    <th scope="row" class="px-4 py-2 text-left font-medium">Total</th>
+                    <th
+                        scope="row"
+                        class="px-4 py-2 text-left font-medium"
+                        :class="{ 'sticky left-0 z-10 bg-background': view === 'months' }">
+                        Total
+                    </th>
                     <td
                         v-for="(seconds, index) in totals"
                         :key="index"
