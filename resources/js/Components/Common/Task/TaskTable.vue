@@ -19,7 +19,7 @@ import {
     type SortDirection,
 } from '@/utils/useSortableTable';
 
-export type SortColumn = 'name' | 'due_date' | 'spent_time' | 'progress';
+export type SortColumn = 'name' | 'created_at' | 'done_at' | 'due_date' | 'spent_time' | 'progress';
 export type { SortDirection } from '@/utils/useSortableTable';
 
 const props = defineProps<{
@@ -37,6 +37,8 @@ const emit = defineEmits<{
 }>();
 
 const columns: SortableColumnDef<Task, SortColumn>[] = [
+    { id: 'created_at', sortDescFirst: true, accessorFn: (task) => task.created_at ?? undefined },
+    { id: 'done_at', sortDescFirst: true, accessorFn: (task) => task.done_at ?? undefined },
     {
         id: 'name',
         accessorFn: (row: Task) => row.name.toLowerCase(),
@@ -191,7 +193,7 @@ const rowGroups = computed(() => {
                 :style="{
                     gridTemplateColumns: showSchedule
                         ? 'minmax(12rem, 1fr) 6rem 6rem 7rem minmax(28rem, 2fr)'
-                        : 'minmax(10rem, 1fr) 11rem minmax(80px, auto) minmax(95px, auto) 8rem 8rem',
+                        : 'minmax(10rem, 1fr) repeat(2, minmax(7.5rem, max-content)) 11rem minmax(80px, auto) minmax(95px, auto) 8rem 8rem',
                 }">
                 <TaskTableHeading
                     v-if="!showSchedule"

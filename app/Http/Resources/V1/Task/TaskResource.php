@@ -40,9 +40,11 @@ class TaskResource extends BaseResource
             'estimated_time' => $this->resource->estimated_time,
             /** Spent time on this task in seconds (sum of the duration of all associated time entries, excl. still running time entries) */
             'spent_time' => $this->resource->spent_time,
-            /** When the tag was created */
+            /** When the task was created */
             'created_at' => $this->formatDateTime($this->resource->created_at),
-            /** When the tag was last updated */
+            /** When the task was marked done */
+            'done_at' => $this->formatDateTime($this->resource->done_at),
+            /** When the task was last updated */
             'updated_at' => $this->formatDateTime($this->resource->updated_at),
         ];
     }

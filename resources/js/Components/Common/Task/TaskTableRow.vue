@@ -12,6 +12,7 @@ import EstimatedTimeProgress from '@/packages/ui/src/EstimatedTimeProgress.vue';
 import UpgradeBadge from '@/packages/ui/src/UpgradeBadge.vue';
 import {
     formatDate,
+    formatDateLocalized,
     formatDuration,
     formatHumanReadableDuration,
     getLocalizedDayJs,
@@ -147,6 +148,24 @@ const showTaskEditModal = ref(false);
             </button>
             <slot name="planned-dates" />
         </div>
+        <template v-if="!$slots.timeline">
+            <div
+                class="flex items-center whitespace-nowrap px-3 text-sm tabular-nums text-text-secondary">
+                {{
+                    task.created_at
+                        ? formatDateLocalized(task.created_at, organization?.date_format)
+                        : '—'
+                }}
+            </div>
+            <div
+                class="flex items-center whitespace-nowrap px-3 text-sm tabular-nums text-text-secondary">
+                {{
+                    task.done_at
+                        ? formatDateLocalized(task.done_at, organization?.date_format)
+                        : '—'
+                }}
+            </div>
+        </template>
         <div
             v-if="!$slots.timeline"
             class="whitespace-nowrap px-3 py-4 flex items-center gap-1.5 text-sm"

@@ -365,6 +365,7 @@ const ProjectResource = z
     .object({
         id: z.string(),
         name: z.string(),
+        created_at: z.string().nullable().optional(),
         color: z.string(),
         client_id: z.union([z.string(), z.null()]),
         is_archived: z.boolean(),
@@ -708,6 +709,7 @@ const TaskResource = z
     .object({
         id: z.string(),
         name: z.string(),
+        done_at: z.string().nullable().optional(),
         is_done: z.boolean(),
         project_id: z.string(),
         start_date: z.union([z.string(), z.null()]).optional(),

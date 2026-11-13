@@ -23,6 +23,20 @@ defineEmits<{
             @sort="$emit('sort', $event)">
             Task Name
         </SortableTableHeaderCell>
+        <SortableTableHeaderCell
+            class="whitespace-nowrap"
+            column="created_at"
+            v-bind="props"
+            @sort="$emit('sort', $event)">
+            Created
+        </SortableTableHeaderCell>
+        <SortableTableHeaderCell
+            class="whitespace-nowrap"
+            column="done_at"
+            v-bind="props"
+            @sort="$emit('sort', $event)">
+            Completed
+        </SortableTableHeaderCell>
         <SortableTableHeaderCell column="due_date" v-bind="props" @sort="$emit('sort', $event)">
             Due date
         </SortableTableHeaderCell>

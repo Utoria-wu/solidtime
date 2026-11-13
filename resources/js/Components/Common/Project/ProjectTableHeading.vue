@@ -36,6 +36,13 @@ function handleSort(column: SortColumn) {
             @sort="handleSort">
             Name
         </SortableTableHeaderCell>
+        <SortableTableHeaderCell
+            class="whitespace-nowrap"
+            column="created_at"
+            v-bind="sortState"
+            @sort="handleSort">
+            Created
+        </SortableTableHeaderCell>
         <div
             data-testid="project_tasks_heading"
             class="px-3 py-1.5 text-left text-text-tertiary flex items-center">

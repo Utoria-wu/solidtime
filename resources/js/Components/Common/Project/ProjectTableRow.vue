@@ -24,7 +24,10 @@ import { formatCents } from '@/packages/ui/src/utils/money';
 import { getOrganizationCurrencyString } from '@/utils/money';
 import EstimatedTimeProgress from '@/packages/ui/src/EstimatedTimeProgress.vue';
 import UpgradeBadge from '@/packages/ui/src/UpgradeBadge.vue';
-import { formatHumanReadableDuration } from '../../../packages/ui/src/utils/time';
+import {
+    formatDateLocalized,
+    formatHumanReadableDuration,
+} from '../../../packages/ui/src/utils/time';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { canUpdateProjects, canDeleteProjects } from '@/utils/permissions';
 import type { Organization } from '@/packages/api/src';
@@ -110,7 +113,9 @@ const { locked: billableRatesLocked } = useBillableRatesLock();
                     <span class="truncate" :title="project.name">
                         {{ project.name }}
                     </span>
-                    <div v-if="projectTags.length" class="flex max-w-[45%] shrink-0 items-center gap-1">
+                    <div
+                        v-if="projectTags.length"
+                        class="flex max-w-[45%] shrink-0 items-center gap-1">
                         <TagBadge
                             v-for="tag in projectTags.slice(0, 2)"
                             :key="tag.id"
@@ -121,10 +126,23 @@ const { locked: billableRatesLocked } = useBillableRatesLock();
                         <TagBadge
                             v-if="projectTags.length > 2"
                             :name="'+' + (projectTags.length - 2)"
-                            :title="projectTags.slice(2).map((tag) => tag.name).join(', ')"
+                            :title="
+                                projectTags
+                                    .slice(2)
+                                    .map((tag) => tag.name)
+                                    .join(', ')
+                            "
                             :show-icon="false"
                             class="shrink-0 px-1.5 py-0.5 text-text-secondary" />
                     </div>
+                </div>
+                <div
+                    class="flex items-center whitespace-nowrap px-3 text-sm tabular-nums text-text-secondary">
+                    {{
+                        project.created_at
+                            ? formatDateLocalized(project.created_at, organization?.date_format)
+                            : '—'
+                    }}
                 </div>
                 <div
                     data-testid="project_tasks"
