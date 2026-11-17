@@ -5,7 +5,7 @@ When a project has several tasks, billable settings, or tags, its hours can be s
 ## What changes
 
 - **Days** shows a collapsible row for each project with daily hours and a weekly total. Expand a project to edit the existing task, billing, and tag rows.
-- **Weeks** shows 12 weeks of actual hours by project. **Months** shows one calendar month with a column for each day, and **Year** shows daily activity as compact colored bars, three months at a time.
+- **Weeks** shows 12 weeks of actual hours by project. **Months** shows one calendar month with a column for each day, and **Year** shows daily activity as compact colored bars, for the entire calendar year.
 - The timeline takes inspiration from the [DeepSeek status page](https://status.deepseek.com/). Project-colored cells show periods with tracked work, and gray cells show periods with no recorded time. In **Weeks**, select a week to open the daily Timesheet with the project expanded. In **Months** and **Year**, select any date cell to open your Activity for that project and day, including time entries, Markdown notes, and links to Calendar.
 
 ![Weekly project totals showing periods of work and gaps](.github/feature-images/timesheet-history-weeks.png)
@@ -16,13 +16,13 @@ When a project has several tasks, billable settings, or tags, its hours can be s
 
 ![Daily project activity in the monthly Timesheet](.github/feature-images/timesheet-month-activity.png)
 
-![Daily activity bars in Timesheet Year](.github/feature-images/timesheet-year-daily.png)
+![Full calendar year of daily activity bars in Timesheet Year](.github/feature-images/timesheet-year-daily.png)
 
-Year loads only the displayed quarter and looks up each entry's date directly when aggregating time.
+Timesheet displays durations to the minute and keeps the underlying time entries at their original precision. Year looks up each entry's date directly when aggregating time.
 
 ## Verification
 
-The Year update passed the frontend build and TypeScript check. In Edge I verified 92 daily bars for the fourth quarter and opened the day's Activity with its recorded notes.
+The frontend build passed. In a local browser I verified all 365 dates in 2026, minute-only durations, and Activity drawers for dates with and without records.
 
 The monthly update was verified in Edge against a local Solidtime API, including November daily columns, populated and empty Activity drawers, Markdown notes, and the Year view. The production frontend build and TypeScript check passed.
 
