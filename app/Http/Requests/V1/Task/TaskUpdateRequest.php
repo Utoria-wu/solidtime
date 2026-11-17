@@ -35,6 +35,7 @@ class TaskUpdateRequest extends BaseFormRequest
                     return $builder->where('project_id', '=', $this->task->project_id);
                 })->ignore($this->task?->getKey())->withCustomTranslation('validation.task_name_already_exists'),
             ],
+            'is_canceled' => ['sometimes', 'boolean', 'prohibits:is_done'],
             'is_done' => [
                 'boolean',
             ],

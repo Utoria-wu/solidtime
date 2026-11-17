@@ -119,6 +119,7 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
             Route::put('/time-entries/{timeEntry}', [TimeEntryController::class, 'update'])->name('update')->middleware('check-organization-blocked');
             Route::patch('/time-entries', [TimeEntryController::class, 'updateMultiple'])->name('update-multiple')->middleware('check-organization-blocked');
             Route::delete('/time-entries/{timeEntry}', [TimeEntryController::class, 'destroy'])->name('destroy');
+            Route::post('/time-entries/{id}/restore', [TimeEntryController::class, 'restore'])->whereUuid('id')->name('restore')->middleware('check-organization-blocked');
             Route::delete('/time-entries', [TimeEntryController::class, 'destroyMultiple'])->name('destroy-multiple');
         });
 

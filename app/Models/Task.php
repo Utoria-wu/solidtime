@@ -25,6 +25,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property string $project_id
  * @property string $organization_id
  * @property Carbon|null $done_at
+ * @property Carbon|null $canceled_at
  * @property string|null $markdown_notes
  * @property Carbon|null $start_date
  * @property Carbon|null $due_date
@@ -60,6 +61,7 @@ class Task extends Model implements AuditableContract
         'start_date' => 'date',
         'due_date' => 'date',
         'done_at' => 'datetime',
+        'canceled_at' => 'datetime',
     ];
 
     /**

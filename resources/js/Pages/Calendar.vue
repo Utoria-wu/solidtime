@@ -3,6 +3,8 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import { useTimeEntriesCalendarQuery } from '@/utils/useTimeEntriesCalendarQuery';
 import { useTimeEntriesMutations } from '@/utils/useTimeEntriesMutations';
 import { computed, ref, onMounted } from 'vue';
+import { useEventListener } from '@vueuse/core';
+import axios from 'axios';
 import type { Dayjs } from 'dayjs';
 import { useQueryClient } from '@tanstack/vue-query';
 import {
@@ -10,6 +12,7 @@ import {
     type CreateClientBody,
     type CreateProjectBody,
     type Project,
+    type TimeEntry,
 } from '@/packages/api/src';
 import { TimeEntryCalendar } from '@/packages/ui/src';
 import type { ActivityPeriod } from '@/packages/ui/src/FullCalendar/activityTypes';
@@ -26,6 +29,7 @@ import { canCreateProjects } from '@/utils/permissions';
 import { useCurrentTimeEntryStore } from '@/utils/useCurrentTimeEntry';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
 import { getCurrentOrganizationId } from '@/utils/useUser';
+import { useNotificationsStore } from '@/utils/notification';
 
 const { organization } = useOrganizationQuery(getCurrentOrganizationId()!);
 const calendarStart = ref<Dayjs | undefined>(undefined);
@@ -64,6 +68,57 @@ const { data: timeEntryResponse, isLoading: timeEntriesLoading } = useTimeEntrie
 const currentTimeEntries = computed(() => {
     return timeEntryResponse?.value?.data || [];
 });
+const undoAction = ref<{ label: string; run: () => Promise<unknown> }>();
+const undoing = ref(false);
+const notifications = useNotificationsStore();
+
+function entryUrl(id: string) {
+    return `/api/v1/organizations/${getCurrentOrganizationId()}/time-entries/${id}`;
+}
+
+function refreshEntryTotals() {
+    for (const name of ['timeEntries', 'tasks', 'projects', 'goals']) {
+        void queryClient.invalidateQueries({ queryKey: [name] });
+    }
+}
+
+async function undoLastChange() {
+    const action = undoAction.value;
+    if (!action || undoing.value) return;
+    undoing.value = true;
+    try {
+        await action.run();
+        if (undoAction.value === action) undoAction.value = undefined;
+        refreshEntryTotals();
+    } catch {
+        // The mutation shows the server error.
+    } finally {
+        undoing.value = false;
+    }
+}
+
+useEventListener('keydown', (event: KeyboardEvent) => {
+    if (
+        !undoAction.value ||
+        undoing.value ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        !(event.ctrlKey || event.metaKey) ||
+        event.altKey ||
+        event.shiftKey ||
+        event.key.toLowerCase() !== 'z'
+    )
+        return;
+    if (
+        event.target instanceof HTMLElement &&
+        (event.target.isContentEditable ||
+            event.target.closest('input, textarea, select, [role="textbox"], [role="dialog"]'))
+    )
+        return;
+    event.preventDefault();
+    void undoLastChange();
+});
 
 const {
     createTimeEntry: createTimeEntryMutation,
@@ -76,14 +131,36 @@ async function createTimeEntry(
     entry: Omit<import('@/packages/api/src').TimeEntry, 'id' | 'organization_id' | 'user_id'>
 ): Promise<void> {
     await createTimeEntryMutation(entry);
+    undoAction.value = undefined;
 }
 
-async function updateTimeEntry(entry: import('@/packages/api/src').TimeEntry): Promise<void> {
+async function updateTimeEntry(entry: TimeEntry): Promise<void> {
+    const previous = currentTimeEntries.value.find((item) => item.id === entry.id);
     await updateTimeEntryMutation(entry);
+    if (previous?.end) {
+        const snapshot = { ...previous, tags: [...previous.tags] };
+        undoAction.value = {
+            label: 'Time entry updated',
+            run: () => updateTimeEntryMutation(snapshot),
+        };
+    }
 }
 
 async function deleteTimeEntry(timeEntryId: string): Promise<void> {
-    await deleteTimeEntryMutation(timeEntryId);
+    const entry = currentTimeEntries.value.find((item) => item.id === timeEntryId);
+    if (!entry?.end) {
+        await deleteTimeEntryMutation(timeEntryId);
+        return;
+    }
+    const url = entryUrl(timeEntryId);
+    await notifications.handleApiRequestNotifications(() =>
+        axios.delete(url, { params: { undoable: true } })
+    );
+    undoAction.value = {
+        label: 'Time entry deleted',
+        run: () => notifications.handleApiRequestNotifications(() => axios.post(url + '/restore')),
+    };
+    refreshEntryTotals();
 }
 
 async function createTag(name: string) {
@@ -123,6 +200,26 @@ function onRefresh() {
         title="Calendar"
         data-testid="calendar_view"
         main-class="p-0 min-h-0 overflow-hidden">
+        <div
+            v-if="undoAction"
+            class="fixed bottom-5 right-5 z-40 flex items-center gap-4 rounded-lg border border-border bg-card-background px-4 py-2 text-sm shadow-md">
+            <span role="status">{{ undoAction.label }}</span>
+            <button
+                type="button"
+                class="rounded px-2 py-1 font-semibold text-accent-400 hover:bg-secondary focus-visible:ring-2"
+                :disabled="undoing"
+                @click="undoLastChange">
+                Undo
+            </button>
+            <button
+                type="button"
+                class="rounded px-2 py-1 text-text-secondary hover:bg-secondary"
+                aria-label="Dismiss undo"
+                :disabled="undoing"
+                @click="undoAction = undefined">
+                ×
+            </button>
+        </div>
         <TimeEntryCalendar
             :time-entries="currentTimeEntries"
             :projects="projects"

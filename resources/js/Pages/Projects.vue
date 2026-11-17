@@ -81,7 +81,10 @@ const scheduleProjects = computed(() =>
 const scheduleTasks = computed(() => {
     const projectIds = new Set(scheduleProjects.value.map((project) => project.id));
     return tasks.value.filter(
-        (task) => projectIds.has(task.project_id) && (showDoneTasks.value || !task.is_done)
+        (task) =>
+            projectIds.has(task.project_id) &&
+            !task.is_canceled &&
+            (showDoneTasks.value || !task.is_done)
     );
 });
 

@@ -68,6 +68,7 @@ class TaskTimerController extends Controller
         $member = $this->member($organization);
         $saved = DB::transaction(function () use ($organization, $task, $project, $member, $input, $action): int {
             $task = Task::query()->lockForUpdate()->findOrFail($task->id);
+            abort_if($task->canceled_at !== null, 422, 'Restore this task before using its timer.');
             $session = TaskTimerSession::query()->where('task_id', $task->id)
                 ->where('member_id', $member->id)->first();
             $now = Carbon::now()->startOfSecond();

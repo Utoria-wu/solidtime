@@ -110,9 +110,22 @@ const organization = inject<ComputedRef<Organization>>('organization');
 
 const today = computed(() => getLocalizedDayJs().format('YYYY-MM-DD'));
 const overdue = computed(
-    () => !!props.task.due_date && !props.task.is_done && props.task.due_date < today.value
+    () =>
+        !!props.task.due_date &&
+        !props.task.is_done &&
+        !props.task.is_canceled &&
+        props.task.due_date < today.value
 );
-const dueToday = computed(() => props.task.due_date === today.value && !props.task.is_done);
+const dueToday = computed(
+    () => props.task.due_date === today.value && !props.task.is_done && !props.task.is_canceled
+);
+
+function toggleCanceled() {
+    void useTasksStore().updateTask(props.task.id, {
+        name: props.task.name,
+        is_canceled: !props.task.is_canceled,
+    });
+}
 
 function deleteTask() {
     useTasksStore().deleteTask(props.task.id);
@@ -219,7 +232,11 @@ const showTaskEditModal = ref(false);
         </div>
         <div class="relative whitespace-nowrap flex items-center gap-1 px-2 text-text-secondary">
             <button
-                v-if="timerReady && (timer?.started_at || (!task.is_done && canUpdateTasks()))"
+                v-if="
+                    !task.is_canceled &&
+                    timerReady &&
+                    (timer?.started_at || (!task.is_done && canUpdateTasks()))
+                "
                 type="button"
                 class="inline-flex size-8 items-center justify-center rounded hover:text-text-primary disabled:opacity-50"
                 :disabled="saving"
@@ -252,9 +269,10 @@ const showTaskEditModal = ref(false);
                 <CheckIcon class="size-4" />
             </button>
             <TaskMoreOptionsDropdown
-                v-if="canDeleteTasks()"
+                v-if="canDeleteTasks() || canUpdateTasks()"
                 :task="task"
                 @done="markTaskAsDone"
+                @cancel="toggleCanceled"
                 @edit="showTaskEditModal = true"
                 @delete="deleteTask"></TaskMoreOptionsDropdown>
         </div>

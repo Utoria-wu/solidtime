@@ -13,6 +13,7 @@ const emit = defineEmits<{
     delete: [];
     edit: [];
     done: [];
+    cancel: [];
 }>();
 const props = defineProps<{
     task: Task;
@@ -50,13 +51,23 @@ const props = defineProps<{
                 <span>Edit</span>
             </DropdownMenuItem>
             <DropdownMenuItem
-                v-if="canUpdateTasks()"
-                :aria-label="'Mark Task ' + props.task.name + ' as done'"
+                v-if="canUpdateTasks() && !props.task.is_canceled"
+                :aria-label="
+                    'Mark Task ' +
+                    props.task.name +
+                    (props.task.is_done ? ' as active' : ' as done')
+                "
                 class="flex items-center space-x-3 cursor-pointer"
                 @click="emit('done')">
                 <CheckCircleIcon class="w-5 text-icon-active" />
                 <span v-if="props.task.is_done">Mark as active</span>
                 <span v-else>Mark as done</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+                v-if="canUpdateTasks() && !props.task.is_done"
+                class="flex items-center space-x-3 cursor-pointer"
+                @click="emit('cancel')">
+                {{ props.task.is_canceled ? 'Restore task' : 'Cancel task' }}
             </DropdownMenuItem>
             <DropdownMenuItem
                 v-if="canDeleteTasks()"

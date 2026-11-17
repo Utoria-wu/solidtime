@@ -4,13 +4,14 @@ import { computed } from 'vue';
 import type { Task } from '@/packages/api/src';
 
 const props = defineProps<{
-    tasks: Pick<Task, 'is_done'>[];
+    tasks: Pick<Task, 'is_done' | 'is_canceled'>[];
     isLoading?: boolean;
     isError?: boolean;
 }>();
 
-const total = computed(() => props.tasks.length);
-const completed = computed(() => props.tasks.filter((task) => task.is_done).length);
+const countedTasks = computed(() => props.tasks.filter((task) => !task.is_canceled));
+const total = computed(() => countedTasks.value.length);
+const completed = computed(() => countedTasks.value.filter((task) => task.is_done).length);
 const percentage = computed(() => (total.value === 0 ? 0 : (completed.value / total.value) * 100));
 const description = computed(
     () => `${completed.value} completed, ${total.value - completed.value} remaining`

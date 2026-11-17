@@ -63,6 +63,7 @@ class TimeEntry extends Model implements AuditableContract
 
     use HasJsonRelationships;
     use HasUuids;
+    use \Illuminate\Database\Eloquent\SoftDeletes;
 
     /**
      * The attributes that should be cast.

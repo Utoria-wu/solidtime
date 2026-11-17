@@ -711,6 +711,7 @@ const TaskResource = z
         name: z.string(),
         done_at: z.string().nullable().optional(),
         is_done: z.boolean(),
+        is_canceled: z.boolean().optional(),
         project_id: z.string(),
         start_date: z.union([z.string(), z.null()]).optional(),
         markdown_notes: z.string().nullable().optional(),
@@ -735,6 +736,7 @@ const TaskUpdateRequest = z
     .object({
         name: z.string().min(1).max(255),
         is_done: z.boolean().optional(),
+        is_canceled: z.boolean().optional(),
         start_date: z.union([z.string(), z.null()]).optional(),
         markdown_notes: z.string().nullable().optional(),
         due_date: z.union([z.string(), z.null()]).optional(),

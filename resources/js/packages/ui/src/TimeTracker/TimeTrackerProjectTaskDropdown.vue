@@ -247,7 +247,7 @@ function updateFilteredResults() {
         // tasks that should be selectable regardless of the search term
         // (open tasks, plus the currently selected one even if it's done)
         const availableTasks = projectTasks.filter((filterTask) => {
-            return !filterTask.is_done || filterTask.id === task.value;
+            return (!filterTask.is_done && !filterTask.is_canceled) || filterTask.id === task.value;
         });
 
         const filteredTasks = availableTasks.filter((filterTask) => {

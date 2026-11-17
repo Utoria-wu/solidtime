@@ -140,7 +140,9 @@ const total = computed(() => entries.value.reduce((sum, entry) => sum + (entry.d
                         v-if="task"
                         class="rounded-md bg-secondary px-2 py-1 font-medium"
                         :class="{ 'text-green-600': task.is_done }"
-                        >{{ task.is_done ? 'Done' : 'Active' }}</span
+                        >{{
+                            task.is_canceled ? 'Canceled' : task.is_done ? 'Done' : 'Active'
+                        }}</span
                     >
                     <span v-if="activity">{{ activity.dateLabel }}</span>
                     <span v-if="data">{{ duration(total) }} tracked</span>

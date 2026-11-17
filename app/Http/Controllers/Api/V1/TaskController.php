@@ -77,7 +77,7 @@ class TaskController extends Controller
         if ($doneFilter === 'true') {
             $query->whereNotNull('done_at');
         } elseif ($doneFilter === 'false') {
-            $query->whereNull('done_at');
+            $query->whereNull('done_at')->whereNull('canceled_at');
         }
 
         $tasks = $query
@@ -152,10 +152,25 @@ class TaskController extends Controller
             $task->start_date = $request->date('start_date', 'Y-m-d');
             $task->due_date = $request->date('due_date', 'Y-m-d');
         }
-        if ($request->has('is_done')) {
-            $task->done_at = $request->getIsDone() ? ($task->done_at ?? Carbon::now()) : null;
-        }
-        $task->save();
+        \Illuminate\Support\Facades\DB::transaction(function () use ($request, &$task): void {
+            $lockedTask = Task::query()->lockForUpdate()->findOrFail($task->id);
+            $lockedTask->forceFill($task->getDirty());
+            if ($request->boolean('is_canceled')) {
+                abort_if($lockedTask->is_done, 422, 'Reopen the completed task before canceling it.');
+                $sessions = \App\Models\TaskTimerSession::query()->where('task_id', $lockedTask->id);
+                abort_if($sessions->get()->contains(fn ($session) => $session->started_at !== null || $session->segments !== []), 422, 'Save any active or unsaved timer segments before canceling this task.');
+                $sessions->delete();
+                $lockedTask->canceled_at ??= Carbon::now();
+            } elseif ($request->has('is_canceled')) {
+                $lockedTask->canceled_at = null;
+            }
+            if ($request->has('is_done')) {
+                abort_if($lockedTask->canceled_at !== null, 422, 'Restore this task before changing its completion status.');
+                $lockedTask->done_at = $request->getIsDone() ? ($lockedTask->done_at ?? Carbon::now()) : null;
+            }
+            $lockedTask->save();
+            $task = $lockedTask;
+        });
 
         return new TaskResource($task);
     }

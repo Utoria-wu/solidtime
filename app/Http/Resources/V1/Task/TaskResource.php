@@ -28,6 +28,7 @@ class TaskResource extends BaseResource
             'name' => $this->resource->name,
             /** Whether the task is done */
             'is_done' => $this->resource->is_done,
+            'is_canceled' => $this->resource->canceled_at !== null,
             /** ID of the project */
             'project_id' => $this->resource->project_id,
             /** First day of the planned task range (YYYY-MM-DD) */

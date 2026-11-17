@@ -47,6 +47,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\File;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -895,7 +896,7 @@ class TimeEntryController extends Controller
      *
      * @operationId deleteTimeEntry
      */
-    public function destroy(Organization $organization, TimeEntry $timeEntry): JsonResponse
+    public function destroy(Organization $organization, TimeEntry $timeEntry, Request $request): JsonResponse
     {
         $member = $this->member($organization);
         if ($timeEntry->member_id === $member->getKey()) {
@@ -907,7 +908,18 @@ class TimeEntryController extends Controller
         $project = $timeEntry->project;
         $task = $timeEntry->task;
 
-        $timeEntry->delete();
+        if ($request->boolean('undoable') && $timeEntry->end !== null) {
+            DB::transaction(function () use ($timeEntry, $task): void {
+                $lockedTask = $task === null ? null : Task::query()->lockForUpdate()->find($task->id);
+                $timeEntry->delete();
+                if ($lockedTask !== null) {
+                    $lockedTask->setComputedAttributeValue('spent_time');
+                    $lockedTask->save();
+                }
+            });
+        } else {
+            $timeEntry->forceDelete();
+        }
 
         if ($project !== null) {
             RecalculateSpentTimeForProject::dispatch($project);
@@ -918,6 +930,27 @@ class TimeEntryController extends Controller
 
         return response()
             ->json(null, 204);
+    }
+
+    public function restore(Organization $organization, string $id): TimeEntryResource
+    {
+        return DB::transaction(function () use ($organization, $id): TimeEntryResource {
+            $entry = TimeEntry::onlyTrashed()->whereBelongsTo($organization)->lockForUpdate()->findOrFail($id);
+            $member = $this->member($organization);
+            $this->checkPermission($organization, $entry->member_id === $member->id ? 'time-entries:delete:own' : 'time-entries:delete:all', $entry);
+            $this->assertNoOverlap($organization, $entry->member, $entry->start, $entry->end, $entry);
+            $task = $entry->task_id === null ? null : Task::query()->lockForUpdate()->find($entry->task_id);
+            $entry->restore();
+            if ($task !== null) {
+                $task->setComputedAttributeValue('spent_time');
+                $task->save();
+            }
+            if ($entry->project !== null) {
+                RecalculateSpentTimeForProject::dispatch($entry->project)->afterCommit();
+            }
+
+            return new TimeEntryResource($entry);
+        });
     }
 
     /**
@@ -965,7 +998,7 @@ class TimeEntryController extends Controller
             $project = $timeEntry->project;
             $task = $timeEntry->task;
 
-            $timeEntry->delete();
+            $timeEntry->forceDelete();
 
             if ($project !== null) {
                 RecalculateSpentTimeForProject::dispatch($project);

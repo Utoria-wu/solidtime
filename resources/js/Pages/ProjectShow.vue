@@ -67,7 +67,7 @@ const billableRateFormatted = computed(() => {
     return null;
 });
 
-const activeTab = ref<'active' | 'done'>('active');
+const activeTab = ref<'active' | 'done' | 'canceled'>('active');
 const openSchedule = new URLSearchParams(usePage().url.split('?')[1]).get('view') === 'schedule';
 
 const { tasks } = useTasksQuery();
@@ -89,9 +89,17 @@ const projectTasks = computed(() => tasks.value.filter((task) => task.project_id
 const completedTasksCount = computed(
     () => projectTasks.value.filter((task) => task.is_done).length
 );
-const activeTasksCount = computed(() => projectTasks.value.length - completedTasksCount.value);
+const canceledTasksCount = computed(
+    () => projectTasks.value.filter((task) => task.is_canceled).length
+);
+const activeTasksCount = computed(
+    () => projectTasks.value.length - completedTasksCount.value - canceledTasksCount.value
+);
 const shownTasks = computed(() =>
-    projectTasks.value.filter((task) => task.is_done === (activeTab.value === 'done'))
+    projectTasks.value.filter(
+        (task) =>
+            activeTab.value === (task.is_canceled ? 'canceled' : task.is_done ? 'done' : 'active')
+    )
 );
 
 // Note: The page sits above the app layout that provides the lock, so it can not inject it
@@ -184,6 +192,9 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                                         </TabBarItem>
                                         <TabBarItem value="done">
                                             Done ({{ completedTasksCount }})
+                                        </TabBarItem>
+                                        <TabBarItem value="canceled">
+                                            Canceled ({{ canceledTasksCount }})
                                         </TabBarItem>
                                     </TabBar>
                                 </div>
