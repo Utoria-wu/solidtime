@@ -55,9 +55,8 @@ function startOfWeek(date: Dayjs) {
 
 const periods = computed(() => {
     if (props.view === 'year') {
-        const month = anchor.value.startOf('month');
-        const first = month.subtract(month.month() % 3, 'month');
-        const end = first.add(3, 'month');
+        const first = anchor.value.startOf('year');
+        const end = first.add(1, 'year');
         return Array.from({ length: end.diff(first, 'day') }, (_, index) => {
             const start = first.add(index, 'day');
             return { start, end: start.add(1, 'day'), week: null };
@@ -105,7 +104,16 @@ const periods = computed(() => {
 
 const range = computed(() => ({ start: periods.value[0]!.start, end: periods.value.at(-1)!.end }));
 const rangeLabel = computed(() =>
-    getDateRangeLabel(range.value.start, range.value.end.subtract(1, 'day'))
+    props.view === 'year'
+        ? range.value.start.format('YYYY')
+        : getDateRangeLabel(range.value.start, range.value.end.subtract(1, 'day'))
+);
+const yearColumns = computed(() => `repeat(${periods.value.length}, minmax(2px, 1fr))`);
+const yearMonths = computed(() =>
+    Array.from({ length: 12 }, (_, month) => {
+        const start = range.value.start.add(month, 'month');
+        return { label: start.format('MMM'), days: start.daysInMonth() };
+    })
 );
 const dates = computed(() =>
     periods.value.map(({ start }) => ({
@@ -197,7 +205,7 @@ function isCurrentPeriod(start: Dayjs, end: Dayjs) {
 }
 
 function navigate(direction: number) {
-    if (props.view === 'year') anchor.value = anchor.value.add(direction * 3, 'month');
+    if (props.view === 'year') anchor.value = anchor.value.add(direction, 'year');
     else if (monthScope.value) anchor.value = anchor.value.add(direction, 'month');
     else if (props.view === 'months') anchor.value = anchor.value.add(direction, 'month');
     else anchor.value = anchor.value.add(direction * 12, 'week');
@@ -259,7 +267,17 @@ function selectPeriod(
     </div>
     <div v-else-if="view === 'year'" class="overflow-x-auto px-2 sm:px-4 lg:px-6">
         <div
-            class="min-w-[44rem] divide-y divide-default-background-separator rounded-xl border border-default-background-separator bg-card-background">
+            class="min-w-[72rem] divide-y divide-default-background-separator rounded-xl border border-default-background-separator bg-card-background">
+            <div
+                class="grid gap-px px-4 py-2 text-xs text-text-secondary"
+                :style="{ gridTemplateColumns: yearColumns }">
+                <span
+                    v-for="month in yearMonths"
+                    :key="month.label"
+                    :style="{ gridColumn: 'span ' + month.days }">
+                    {{ month.label }}
+                </span>
+            </div>
             <section v-for="row in rows" :key="row.id ?? 'no-project'" class="px-4 py-4">
                 <div class="mb-3 flex items-center justify-between gap-3 text-sm">
                     <h3 class="flex items-center gap-2 font-medium">
@@ -273,15 +291,15 @@ function selectPeriod(
                     }}</span>
                 </div>
                 <div
-                    class="grid gap-0.5"
+                    class="grid gap-px"
                     :style="{
-                        gridTemplateColumns: 'repeat(' + dates.length + ', minmax(0, 1fr))',
+                        gridTemplateColumns: yearColumns,
                     }">
                     <button
                         v-for="(date, index) in dates"
                         :key="date.key"
                         type="button"
-                        class="h-5 rounded-sm bg-secondary hover:ring-1 focus-visible:ring-2 ring-ring"
+                        class="h-4 rounded-[1px] bg-secondary hover:ring-1 focus-visible:ring-2 ring-ring"
                         :style="
                             row.values[index]
                                 ? {

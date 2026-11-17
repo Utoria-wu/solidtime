@@ -116,16 +116,20 @@ const {
 watch(weekStart, () => clearSlots(), { flush: 'sync' });
 
 // ── Formatters ────────────────────────────────────────────────────
-const intervalFormat = computed(() => organization.value?.interval_format ?? 'hours-minutes');
 const numberFormat = computed(() => organization.value?.number_format ?? 'point');
 
 function formatDuration(seconds: number): string {
     if (seconds === 0) return '-';
-    return formatHumanReadableDuration(seconds, intervalFormat.value, numberFormat.value);
+    if (seconds > 0 && seconds < 60) return '<1 min';
+    return formatHumanReadableDuration(
+        Math.floor(seconds / 60) * 60,
+        'hours-minutes',
+        numberFormat.value
+    );
 }
 
 const weekTotalFormatted = computed(() =>
-    formatHumanReadableDuration(grandTotal.value, intervalFormat.value, numberFormat.value)
+    grandTotal.value ? formatDuration(grandTotal.value) : '0h'
 );
 
 const weekRangeLabel = computed(() =>
