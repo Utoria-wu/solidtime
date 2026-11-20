@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { TrashIcon, PencilSquareIcon, CheckCircleIcon } from '@heroicons/vue/20/solid';
+import {
+    TrashIcon,
+    PencilSquareIcon,
+    CheckCircleIcon,
+    XCircleIcon,
+    ArrowUturnLeftIcon,
+} from '@heroicons/vue/20/solid';
 import type { Task } from '@/packages/api/src';
 import { canDeleteTasks, canUpdateTasks } from '@/utils/permissions';
 import {
@@ -67,7 +73,9 @@ const props = defineProps<{
                 v-if="canUpdateTasks() && !props.task.is_done"
                 class="flex items-center space-x-3 cursor-pointer"
                 @click="emit('cancel')">
-                {{ props.task.is_canceled ? 'Restore task' : 'Cancel task' }}
+                <ArrowUturnLeftIcon v-if="props.task.is_canceled" class="w-5 text-icon-active" />
+                <XCircleIcon v-else class="w-5 text-icon-active" />
+                <span>{{ props.task.is_canceled ? 'Restore task' : 'Cancel' }}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
                 v-if="canDeleteTasks()"
