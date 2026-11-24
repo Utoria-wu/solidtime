@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { Task } from '@/packages/api/src';
-import { CheckIcon, PauseIcon, PlayIcon } from '@heroicons/vue/20/solid';
+import { CheckIcon, PauseIcon, PlayIcon, StopIcon } from '@heroicons/vue/20/solid';
 import { useTasksStore } from '@/utils/useTasks';
 import TaskMoreOptionsDropdown from '@/Components/Common/Task/TaskMoreOptionsDropdown.vue';
 import TableRow from '@/Components/TableRow.vue';
 import { canDeleteTasks, canUpdateTasks } from '@/utils/permissions';
 import TaskEditModal from '@/Components/Common/Task/TaskEditModal.vue';
-import { computed, ref, inject, type ComputedRef } from 'vue';
+import { computed, ref, inject, nextTick, type ComputedRef } from 'vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import EstimatedTimeProgress from '@/packages/ui/src/EstimatedTimeProgress.vue';
 import UpgradeBadge from '@/packages/ui/src/UpgradeBadge.vue';
@@ -58,7 +58,7 @@ const timerAvailable = computed(
         !!props.timer &&
         props.timer.id === completionTimerId.value &&
         (dialogAction.value === 'complete' ||
-            (props.timer.started_at !== null && props.timer.version === pauseVersion.value))
+            (props.timer.started_at === null && props.timer.version === pauseVersion.value))
 );
 const canSaveCompletion = computed(
     () => !saving.value && timerAvailable.value && eventName.value.trim().length > 0
@@ -76,6 +76,16 @@ function handleTimerButton() {
     const timer = props.timer;
     if (!timer) return void changeTimer('start');
     if (timer.started_at === null) return void changeTimer('resume');
+    void changeTimer('stop');
+}
+
+async function openPause() {
+    if (!props.timer || saving.value) return;
+    const sessionId = props.timer.id;
+    if (props.timer.started_at !== null && !(await changeTimer('stop'))) return;
+    await nextTick();
+    const timer = props.timer;
+    if (!timer || timer.id !== sessionId || timer.started_at !== null) return;
 
     dialogAction.value = 'pause';
     pauseVersion.value = timer.version;
@@ -94,13 +104,15 @@ function submitCompletion() {
 }
 
 async function changeTimer(action: TaskTimerAction, completion?: TaskTimerCompletion) {
-    if (saving.value) return;
+    if (saving.value) return false;
     saving.value = true;
     try {
         await props.change(props.task.id, action, props.timer, completion);
         if (action === 'complete' || action === 'pause') completionTimerId.value = null;
+        return true;
     } catch {
         // The API notification shows the error.
+        return false;
     } finally {
         saving.value = false;
     }
@@ -244,19 +256,34 @@ const showTaskEditModal = ref(false);
                     timer
                         ? timer.started_at === null
                             ? 'Resume timer'
-                            : 'Pause timer'
+                            : 'Stop timer'
                         : 'Start timer'
                 "
                 :aria-label="
                     timer
                         ? timer.started_at === null
                             ? 'Resume timer'
-                            : 'Pause timer'
+                            : 'Stop timer'
                         : 'Start timer'
                 "
                 @click="handleTimerButton">
-                <PauseIcon v-if="timer?.started_at" class="size-4" />
+                <StopIcon v-if="timer?.started_at" class="size-4" />
                 <PlayIcon v-else class="size-4" />
+            </button>
+            <button
+                v-if="
+                    !task.is_canceled &&
+                    timerReady &&
+                    timer &&
+                    (timer.started_at !== null || timer.elapsed_seconds > 0)
+                "
+                type="button"
+                class="inline-flex size-8 shrink-0 items-center justify-center rounded hover:text-text-primary disabled:opacity-50"
+                :disabled="saving"
+                title="Pause and save to Calendar"
+                aria-label="Pause and save to Calendar"
+                @click="openPause">
+                <PauseIcon class="size-4" />
             </button>
             <button
                 v-if="timer && canUpdateTasks()"
@@ -306,7 +333,8 @@ const showTaskEditModal = ref(false);
                         <TimeEntryNotesField v-model="notes" />
                     </fieldset>
                     <p v-if="dialogAction === 'pause'" class="mt-3">
-                        Pausing saves this segment to Calendar and keeps the task active.
+                        The timer is stopped. Save your pending work and notes to Calendar, or
+                        cancel to keep the time pending.
                     </p>
                     <p v-else class="mt-3">
                         Saving logs any remaining timer segments and marks the task as Done.
@@ -326,7 +354,7 @@ const showTaskEditModal = ref(false);
                         saving
                             ? 'Saving…'
                             : dialogAction === 'pause'
-                              ? 'Pause timer'
+                              ? 'Save to Calendar'
                               : 'Save and complete'
                     }}
                 </PrimaryButton>

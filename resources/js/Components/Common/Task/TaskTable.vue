@@ -197,8 +197,8 @@ const { t } = useInterfaceLanguage();
                 :class="{ 'schedule-table': showSchedule }"
                 :style="{
                     gridTemplateColumns: showSchedule
-                        ? 'minmax(13rem, 1fr) 5rem 7rem minmax(34rem, 2.5fr)'
-                        : 'minmax(10rem, 1fr) repeat(2, minmax(7.5rem, max-content)) 11rem minmax(80px, auto) minmax(95px, auto) 8rem 8rem',
+                        ? 'minmax(13rem, 1fr) 5rem 9.5rem minmax(34rem, 2.5fr)'
+                        : 'minmax(10rem, 1fr) repeat(2, minmax(7.5rem, max-content)) 11rem minmax(80px, auto) minmax(95px, auto) 8rem 9.5rem',
                     '--schedule-days': scheduleDays,
                 }">
                 <TaskTableHeading

@@ -14,6 +14,62 @@ use Laravel\Passport\Passport;
 
 class TaskTimerEndpointTest extends ApiEndpointTestAbstract
 {
+    public function test_stop_keeps_pending_time_until_pause_or_completion_saves_it(): void
+    {
+        $data = $this->createUserWithPermission([
+            'time-entries:create:own', 'tasks:update:all', 'tasks:view:all', 'projects:view:all',
+        ]);
+        Passport::actingAs($data->user);
+        $project = Project::factory()->forOrganization($data->organization)->create();
+        $task = Task::factory()->forOrganization($data->organization)->for($project)->create();
+        $url = route('api.v1.tasks.timers.update', [$data->organization, $task]);
+        $index = route('api.v1.tasks.timers.index', [$data->organization]);
+
+        $this->travelTo(Carbon::parse('2026-11-24 10:00:00', 'UTC'));
+        $this->postJson($url, ['action' => 'start', 'version' => 0])->assertOk();
+        $id = $this->getJson($index)->json('data.0.id');
+        $this->travel(5)->minutes();
+        $stop = ['action' => 'stop', 'session_id' => $id, 'version' => 0];
+        $this->postJson($url, $stop)->assertOk()->assertJsonPath('saved_entries', 0);
+        $this->getJson($index)->assertJsonPath('data.0.started_at', null)
+            ->assertJsonPath('data.0.elapsed_seconds', 300)->assertJsonPath('data.0.version', 1);
+        $this->assertDatabaseCount('time_entries', 0);
+        $this->assertNull($task->fresh()->done_at);
+        $this->postJson($url, $stop)->assertUnprocessable();
+
+        $this->travel(5)->minutes();
+        $this->postJson($url, ['action' => 'resume', 'session_id' => $id, 'version' => 1])->assertOk();
+        $this->travel(5)->minutes();
+        $this->postJson($url, ['action' => 'stop', 'session_id' => $id, 'version' => 2])->assertOk();
+        $this->travel(10)->minutes();
+        $this->getJson($index)->assertJsonPath('data.0.elapsed_seconds', 600);
+        $this->assertDatabaseCount('time_entries', 0);
+
+        $pause = ['action' => 'pause', 'session_id' => $id, 'version' => 3,
+            'description' => 'Investigate Calendar synchronization', 'markdown_notes' => '## Found the cause'];
+        $this->postJson($url, $pause)->assertOk()->assertJsonPath('saved_entries', 2);
+        $this->postJson($url, $pause)->assertUnprocessable();
+        $entries = TimeEntry::query()->whereBelongsTo($task, 'task')->orderBy('start')->get();
+        $this->assertSame([$pause['markdown_notes'], $pause['markdown_notes']], $entries->pluck('markdown_notes')->all());
+        $this->assertSame([['10:00', '10:05'], ['10:10', '10:15']],
+            $entries->map(fn (TimeEntry $entry) => [$entry->start->format('H:i'), $entry->end?->format('H:i')])->all());
+        $this->assertSame(600, $task->fresh()->spent_time);
+        $this->assertNull($task->fresh()->done_at);
+        $this->getJson($index)->assertJsonPath('data.0.elapsed_seconds', 0)
+            ->assertJsonPath('data.0.started_at', null);
+        $this->postJson($url, ['action' => 'pause', 'session_id' => $id, 'version' => 4,
+            'markdown_notes' => 'No work to save'])->assertUnprocessable();
+
+        $this->postJson($url, ['action' => 'resume', 'session_id' => $id, 'version' => 4])->assertOk();
+        $this->travel(5)->minutes();
+        $this->postJson($url, ['action' => 'stop', 'session_id' => $id, 'version' => 5])->assertOk();
+        $this->postJson($url, ['action' => 'complete', 'session_id' => $id, 'version' => 6,
+            'markdown_notes' => 'Verified the fix'])->assertOk()->assertJsonPath('saved_entries', 1);
+        $this->assertDatabaseCount('time_entries', 3);
+        $this->assertSame(900, $task->fresh()->spent_time);
+        $this->assertNotNull($task->fresh()->done_at);
+    }
+
     public function test_parallel_timers_keep_pause_gaps_and_complete_only_the_selected_task(): void
     {
         $data = $this->createUserWithPermission([
