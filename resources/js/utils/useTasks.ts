@@ -12,7 +12,7 @@ export const useTasksStore = defineStore('tasks', () => {
     async function updateTask(taskId: string, taskBody: UpdateTaskBody) {
         const organizationId = getCurrentOrganizationId();
         if (organizationId) {
-            await handleApiRequestNotifications(
+            const result = await handleApiRequestNotifications(
                 () =>
                     api.updateTask(taskBody, {
                         params: {
@@ -24,13 +24,14 @@ export const useTasksStore = defineStore('tasks', () => {
                 'Failed to update task'
             );
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            return result;
         }
     }
 
     async function createTask(task: CreateTaskBody) {
         const organizationId = getCurrentOrganizationId();
         if (organizationId) {
-            await handleApiRequestNotifications(
+            const result = await handleApiRequestNotifications(
                 () =>
                     api.createTask(task, {
                         params: {
@@ -41,13 +42,14 @@ export const useTasksStore = defineStore('tasks', () => {
                 'Failed to create task'
             );
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            return result;
         }
     }
 
     async function deleteTask(taskId: string) {
         const organizationId = getCurrentOrganizationId();
         if (organizationId) {
-            await handleApiRequestNotifications(
+            const result = await handleApiRequestNotifications(
                 () =>
                     api.deleteTask(undefined, {
                         params: {
@@ -59,6 +61,7 @@ export const useTasksStore = defineStore('tasks', () => {
                 'Failed to delete task'
             );
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            return result;
         }
     }
 

@@ -8,13 +8,14 @@ import { useFocus } from '@vueuse/core';
 import { useTasksStore } from '@/utils/useTasks';
 import type { Task, UpdateTaskBody } from '@/packages/api/src';
 import TimeEntryNotesField from '@/packages/ui/src/TimeEntry/TimeEntryNotesField.vue';
+import TaskCategoryField from './TaskCategoryField.vue';
 import TaskDatesField from './TaskDatesField.vue';
 import EstimatedTimeSection from '@/packages/ui/src/EstimatedTimeSection.vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { Field, FieldGroup, FieldLabel } from '@/packages/ui/src/field';
 
 const { updateTask } = useTasksStore();
-const show = defineModel('show', { default: false });
+const show = defineModel<boolean>('show', { default: false });
 const saving = ref(false);
 
 const props = defineProps<{
@@ -26,6 +27,8 @@ const taskBody = ref<UpdateTaskBody>({
     estimated_time: props.task.estimated_time,
 });
 
+const categoryId = ref<string | null>(props.task.category_id ?? null);
+const stage = ref(props.task.stage ?? '');
 const taskNotes = ref<string | null>(props.task.markdown_notes ?? null);
 const taskDates = ref({
     start_date: props.task.start_date ?? null,
@@ -35,6 +38,8 @@ const taskDates = ref({
 watch(show, (open) => {
     if (!open) return;
     taskNotes.value = props.task.markdown_notes ?? null;
+    categoryId.value = props.task.category_id ?? null;
+    stage.value = props.task.stage ?? '';
     taskBody.value = { name: props.task.name, estimated_time: props.task.estimated_time };
     taskDates.value = {
         start_date: props.task.start_date ?? null,
@@ -43,12 +48,20 @@ watch(show, (open) => {
 });
 
 async function submit() {
-    await updateTask(props.task.id, {
-        ...taskBody.value,
-        ...taskDates.value,
-        markdown_notes: taskNotes.value,
-    });
-    show.value = false;
+    if (saving.value) return;
+    saving.value = true;
+    try {
+        const result = await updateTask(props.task.id, {
+            ...taskBody.value,
+            ...taskDates.value,
+            markdown_notes: taskNotes.value,
+            category_id: categoryId.value,
+            stage: stage.value.trim() || null,
+        });
+        if (result) show.value = false;
+    } finally {
+        saving.value = false;
+    }
 }
 
 const taskNameInput = ref<HTMLInputElement | null>(null);
@@ -85,6 +98,19 @@ useFocus(taskNameInput, { initialValue: true });
                         v-if="isAllowedToPerformPremiumAction()"
                         v-model="taskBody.estimated_time"
                         @submit="submit()"></EstimatedTimeSection>
+                </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <TaskCategoryField v-model="categoryId" /><Field
+                        ><FieldLabel for="task-stage"
+                            >Stage <span class="text-text-secondary">(optional)</span></FieldLabel
+                        ><TextInput
+                            id="task-stage"
+                            v-model="stage"
+                            class="w-full"
+                            placeholder="e.g. Research, Implementation"
+                            maxlength="100"
+                            autocomplete="off"
+                    /></Field>
                 </div>
                 <TimeEntryNotesField v-model="taskNotes" label="Task notes" />
             </FieldGroup>

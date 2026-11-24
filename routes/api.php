@@ -18,7 +18,9 @@ use App\Http\Controllers\Api\V1\ProjectMemberController;
 use App\Http\Controllers\Api\V1\Public\ReportController as PublicReportController;
 use App\Http\Controllers\Api\V1\ReportController;
 use App\Http\Controllers\Api\V1\TagController;
+use App\Http\Controllers\Api\V1\TaskCategoryController;
 use App\Http\Controllers\Api\V1\TaskController;
+use App\Http\Controllers\Api\V1\TaskHistoryController;
 use App\Http\Controllers\Api\V1\TaskTimerController;
 use App\Http\Controllers\Api\V1\TimeEntryController;
 use App\Http\Controllers\Api\V1\TimeZoneController;
@@ -179,6 +181,13 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
         Route::name('tasks.')->prefix('/organizations/{organization}')->group(static function (): void {
             Route::get('/task-timers', [TaskTimerController::class, 'index'])->name('timers.index');
             Route::post('/task-timers/{task}', [TaskTimerController::class, 'update'])->name('timers.update')->middleware('check-organization-blocked');
+            Route::get('/task-categories', [TaskCategoryController::class, 'index'])->name('task-categories.index');
+            Route::post('/task-categories', [TaskCategoryController::class, 'store'])->middleware('check-organization-blocked')->name('task-categories.store');
+            Route::put('/task-categories/{category}', [TaskCategoryController::class, 'update'])->middleware('check-organization-blocked')->name('task-categories.update');
+            Route::get('/projects/{project}/history', [TaskHistoryController::class, 'index'])->name('projects.history.index');
+            Route::post('/projects/{project}/history', [TaskHistoryController::class, 'store'])->middleware('check-organization-blocked')->name('projects.history.store');
+            Route::put('/projects/{project}/history/{entry}', [TaskHistoryController::class, 'update'])->middleware('check-organization-blocked')->name('projects.history.update');
+            Route::delete('/projects/{project}/history/{entry}', [TaskHistoryController::class, 'destroy'])->middleware('check-organization-blocked')->name('projects.history.destroy');
             Route::get('/tasks', [TaskController::class, 'index'])->name('index');
             Route::post('/tasks', [TaskController::class, 'store'])->name('store')->middleware('check-organization-blocked');
             Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('update')->middleware('check-organization-blocked');

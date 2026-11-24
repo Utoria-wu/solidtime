@@ -68,7 +68,10 @@ const billableRateFormatted = computed(() => {
 });
 
 const activeTab = ref<'active' | 'done' | 'canceled'>('active');
-const openSchedule = new URLSearchParams(usePage().url.split('?')[1]).get('view') === 'schedule';
+const requestedView = new URLSearchParams(usePage().url.split('?')[1]).get('view');
+const initialView =
+    requestedView === 'history' || requestedView === 'schedule' ? requestedView : 'list';
+const taskView = ref(initialView);
 
 const { tasks } = useTasksQuery();
 const { timers } = useTaskTimers();
@@ -185,7 +188,7 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                     <CardTitle title="Tasks" :icon="CheckCircleIcon">
                         <template #actions>
                             <div class="w-full items-center flex justify-between">
-                                <div class="pl-6">
+                                <div v-if="taskView !== 'history'" class="pl-6">
                                     <TabBar v-model="activeTab">
                                         <TabBarItem value="active">
                                             Active ({{ activeTasksCount }})
@@ -203,6 +206,7 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                                 </span>
                                 <SecondaryButton
                                     v-if="canCreateTasks()"
+                                    class="ml-auto"
                                     :icon="PlusIcon"
                                     @click="createTask = true"
                                     >Create Task
@@ -218,9 +222,12 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                             :tasks="shownTasks"
                             :project-id="projectId"
                             :allow-schedule="activeTab === 'active'"
-                            :initial-view="openSchedule ? 'schedule' : 'list'"
+                            :initial-view="initialView"
+                            allow-history
+                            :history-tasks="projectTasks"
                             :sort-column="tableState.sortColumn"
                             :sort-direction="tableState.sortDirection"
+                            @view-change="taskView = $event"
                             @sort="handleSort"></TaskTable>
                     </div>
                 </div>

@@ -42,6 +42,7 @@ yarn-error.log
 /frankenphp
 /public/frankenphp-worker.php
 /data
+/.data
 /config/caddy
 /config/composer
 /config/psysh
