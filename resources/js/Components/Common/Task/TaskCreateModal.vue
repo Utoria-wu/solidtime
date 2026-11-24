@@ -9,6 +9,7 @@ import { useTasksStore } from '@/utils/useTasks';
 import ProjectDropdown from '@/Components/Common/Project/ProjectDropdown.vue';
 import TimeEntryNotesField from '@/packages/ui/src/TimeEntry/TimeEntryNotesField.vue';
 import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
+import TaskCategoryField from './TaskCategoryField.vue';
 import TaskDatesField from './TaskDatesField.vue';
 import EstimatedTimeSection from '@/packages/ui/src/EstimatedTimeSection.vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
@@ -18,10 +19,12 @@ import { ChevronDown } from '@lucide/vue';
 import { FolderIcon } from '@heroicons/vue/20/solid';
 
 const { createTask } = useTasksStore();
-const show = defineModel('show', { default: false });
+const show = defineModel<boolean>('show', { default: false });
 const saving = ref(false);
 
 const taskName = ref('');
+const categoryId = ref<string | null>(null);
+const stage = ref('');
 const taskNotes = ref<string | null>(null);
 const taskDates = ref<{ start_date: string | null; due_date: string | null }>({
     start_date: null,
@@ -33,6 +36,8 @@ watch(
     (open) => {
         if (open) {
             taskNotes.value = null;
+            categoryId.value = null;
+            stage.value = '';
             const today = getLocalizedDayJs().format('YYYY-MM-DD');
             taskDates.value = { start_date: today, due_date: today };
         }
@@ -55,15 +60,25 @@ watch(
 );
 
 async function submit() {
-    await createTask({
-        name: taskName.value,
-        ...taskDates.value,
-        markdown_notes: taskNotes.value,
-        project_id: taskProjectId.value,
-        estimated_time: estimatedTime.value,
-    });
-    show.value = false;
-    taskName.value = '';
+    if (saving.value) return;
+    saving.value = true;
+    try {
+        const result = await createTask({
+            name: taskName.value,
+            ...taskDates.value,
+            markdown_notes: taskNotes.value,
+            category_id: categoryId.value,
+            stage: stage.value.trim() || null,
+            project_id: taskProjectId.value,
+            estimated_time: estimatedTime.value,
+        });
+        if (result) {
+            show.value = false;
+            taskName.value = '';
+        }
+    } finally {
+        saving.value = false;
+    }
 }
 
 const taskNameInput = ref<HTMLInputElement | null>(null);
@@ -116,6 +131,19 @@ useFocus(taskNameInput, { initialValue: true });
                         v-if="isAllowedToPerformPremiumAction()"
                         v-model="estimatedTime"
                         @submit="submit()"></EstimatedTimeSection>
+                </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <TaskCategoryField v-model="categoryId" /><Field
+                        ><FieldLabel for="task-stage"
+                            >Stage <span class="text-text-secondary">(optional)</span></FieldLabel
+                        ><TextInput
+                            id="task-stage"
+                            v-model="stage"
+                            class="w-full"
+                            placeholder="e.g. Research, Implementation"
+                            maxlength="100"
+                            autocomplete="off"
+                    /></Field>
                 </div>
                 <TimeEntryNotesField v-model="taskNotes" label="Task notes" />
             </FieldGroup>

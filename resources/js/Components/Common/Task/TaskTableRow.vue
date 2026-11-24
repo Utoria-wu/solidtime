@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TaskCategory } from '@/utils/useTaskHistory';
 import type { Task } from '@/packages/api/src';
 import { CheckIcon, PauseIcon, PlayIcon, StopIcon } from '@heroicons/vue/20/solid';
 import { useTasksStore } from '@/utils/useTasks';
@@ -35,6 +36,7 @@ const emit = defineEmits<{ openActivity: [] }>();
 
 const props = defineProps<{
     task: Task;
+    taskCategory?: TaskCategory;
     timer?: TaskTimer;
     timerReady: boolean;
     now: number;
@@ -169,6 +171,12 @@ const showTaskEditModal = ref(false);
                 @click="emit('openActivity')">
                 {{ task.name }}
             </button>
+            <span
+                v-if="taskCategory"
+                class="max-w-28 truncate rounded px-1.5 py-0.5 text-[11px] font-normal"
+                :style="{ color: taskCategory.color, backgroundColor: taskCategory.color + '12' }"
+                >{{ taskCategory.name }}</span
+            >
             <slot name="planned-dates" />
         </div>
         <template v-if="!$slots.timeline">

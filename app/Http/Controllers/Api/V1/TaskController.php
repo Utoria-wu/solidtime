@@ -13,10 +13,12 @@ use App\Http\Resources\V1\Task\TaskResource;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskTimerSession;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class TaskController extends Controller
 {
@@ -110,6 +112,8 @@ class TaskController extends Controller
         $task->name = $request->input('name');
         $task->project_id = $request->input('project_id');
         $task->markdown_notes = $request->validated('markdown_notes');
+        $task->category_id = $request->validated('category_id');
+        $task->stage = $request->validated('stage');
         $task->start_date = $request->date('start_date', 'Y-m-d');
         $task->due_date = $request->date('due_date', 'Y-m-d');
         if ($this->canAccessPremiumFeatures($organization) && $request->has('estimated_time')) {
@@ -145,6 +149,11 @@ class TaskController extends Controller
         if ($this->canAccessPremiumFeatures($organization) && $request->has('estimated_time')) {
             $task->estimated_time = $request->getEstimatedTime();
         }
+        foreach (['category_id', 'stage'] as $field) {
+            if ($request->has($field)) {
+                $task->{$field} = $request->validated($field);
+            }
+        }
         if ($request->has('markdown_notes')) {
             $task->markdown_notes = $request->validated('markdown_notes');
         }
@@ -152,12 +161,12 @@ class TaskController extends Controller
             $task->start_date = $request->date('start_date', 'Y-m-d');
             $task->due_date = $request->date('due_date', 'Y-m-d');
         }
-        \Illuminate\Support\Facades\DB::transaction(function () use ($request, &$task): void {
+        DB::transaction(function () use ($request, &$task): void {
             $lockedTask = Task::query()->lockForUpdate()->findOrFail($task->id);
             $lockedTask->forceFill($task->getDirty());
             if ($request->boolean('is_canceled')) {
                 abort_if($lockedTask->is_done, 422, 'Reopen the completed task before canceling it.');
-                $sessions = \App\Models\TaskTimerSession::query()->where('task_id', $lockedTask->id);
+                $sessions = TaskTimerSession::query()->where('task_id', $lockedTask->id);
                 abort_if($sessions->get()->contains(fn ($session) => $session->started_at !== null || $session->segments !== []), 422, 'Save any active or unsaved timer segments before canceling this task.');
                 $sessions->delete();
                 $lockedTask->canceled_at ??= Carbon::now();

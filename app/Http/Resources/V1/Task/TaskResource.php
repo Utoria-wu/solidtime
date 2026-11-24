@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Resources\V1\Task;
 
 use App\Http\Resources\V1\BaseResource;
-use App\Models\Tag;
 use App\Models\Task;
 use Illuminate\Http\Request;
 
@@ -26,17 +25,18 @@ class TaskResource extends BaseResource
             'id' => $this->resource->id,
             /** Name */
             'name' => $this->resource->name,
+            'category_id' => $this->resource->category_id,
+            'stage' => $this->resource->stage,
             /** Whether the task is done */
             'is_done' => $this->resource->is_done,
             'is_canceled' => $this->resource->canceled_at !== null,
             /** ID of the project */
             'project_id' => $this->resource->project_id,
-            /** First day of the planned task range (YYYY-MM-DD) */
             'markdown_notes' => $this->resource->markdown_notes,
+            /** First day of the planned task range (YYYY-MM-DD) */
             'start_date' => $this->resource->start_date?->toDateString(),
             /** Last day of the planned task range (YYYY-MM-DD) */
             'due_date' => $this->resource->due_date?->toDateString(),
-            'markdown_notes' => $this->resource->markdown_notes,
             /** Estimated time in seconds */
             'estimated_time' => $this->resource->estimated_time,
             /** Spent time on this task in seconds (sum of the duration of all associated time entries, excl. still running time entries) */

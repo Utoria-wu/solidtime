@@ -3,8 +3,10 @@ import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import { PlusCircleIcon } from '@heroicons/vue/24/solid';
 import { PlusIcon } from '@heroicons/vue/16/solid';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { getDayJsInstance, getLocalizedDayJs } from '@/packages/ui/src/utils/time';
+import { useTaskCategories } from '@/utils/useTaskHistory';
+import ProjectTaskHistory from './ProjectTaskHistory.vue';
 import TaskScheduleTrack from './TaskScheduleTrack.vue';
 import { useTimestamp } from '@vueuse/core';
 import { useTaskTimers } from '@/utils/useTaskTimers';
@@ -29,11 +31,14 @@ const props = defineProps<{
     sortColumn: SortColumn;
     sortDirection: SortDirection;
     allowSchedule?: boolean;
-    initialView?: 'list' | 'schedule';
+    allowHistory?: boolean;
+    historyTasks?: Task[];
+    initialView?: 'list' | 'schedule' | 'history';
     scheduleProjects?: { id: string; name: string }[];
 }>();
 
 const emit = defineEmits<{
+    viewChange: [view: 'list' | 'schedule' | 'history'];
     sort: [column: SortColumn, direction: SortDirection];
 }>();
 
@@ -79,6 +84,8 @@ function handleSort(column: SortColumn) {
     emit('sort', column, nextDirection(column));
 }
 
+const { categories: taskCategories } = useTaskCategories();
+const categoryMap = computed(() => new Map(taskCategories.value.map((item) => [item.id, item])));
 const createTask = ref(false);
 const activityTaskId = ref<string | null>(null);
 const activityOpen = ref(false);
@@ -91,7 +98,25 @@ const { timers, change, ready } = useTaskTimers();
 const timersByTask = computed(() => new Map(timers.value.map((timer) => [timer.task_id, timer])));
 const timestamp = useTimestamp({ interval: 1000 });
 const now = computed(() => Math.floor(timestamp.value / 1000));
-const view = ref<'list' | 'schedule'>(props.initialView ?? 'list');
+const view = ref<'list' | 'schedule' | 'history'>(props.initialView ?? 'list');
+const viewOptions = computed(
+    () =>
+        [
+            'list',
+            ...(props.allowSchedule ? ['schedule'] : []),
+            ...(props.allowHistory ? ['history'] : []),
+        ] as ('list' | 'schedule' | 'history')[]
+);
+function changeView(option: 'list' | 'schedule' | 'history') {
+    view.value = option;
+    emit('viewChange', option);
+}
+watch(
+    () => props.allowSchedule,
+    (enabled) => {
+        if (!enabled && !props.scheduleProjects && view.value === 'schedule') changeView('list');
+    }
+);
 const showSchedule = computed(
     () => !!props.scheduleProjects || (props.allowSchedule && view.value === 'schedule')
 );
@@ -164,21 +189,21 @@ const { t } = useInterfaceLanguage();
     <TaskActivityDialog v-if="activityTask" v-model:open="activityOpen" :task="activityTask" />
     <TaskCreateModal v-if="projectId" v-model:show="createTask" :project-id="projectId" />
     <div
-        v-if="allowSchedule || scheduleProjects"
+        v-if="allowSchedule || scheduleProjects || allowHistory"
         class="flex flex-wrap items-center justify-between gap-3 py-3">
         <div
-            v-if="allowSchedule"
+            v-if="allowSchedule || allowHistory"
             role="group"
             aria-label="Task view"
             class="flex gap-1 rounded-lg bg-tertiary p-1">
             <button
-                v-for="option in ['list', 'schedule'] as const"
+                v-for="option in viewOptions"
                 :key="option"
                 type="button"
                 :aria-pressed="view === option"
                 class="rounded-md px-3 py-1.5 text-sm capitalize text-text-secondary aria-pressed:bg-default-background aria-pressed:text-text-primary aria-pressed:shadow-sm"
-                @click="view = option">
-                {{ t(option === 'list' ? 'List' : 'Schedule') }}
+                @click="changeView(option)">
+                {{ option === 'history' ? 'History' : t(option === 'list' ? 'List' : 'Schedule') }}
             </button>
         </div>
         <div v-if="showSchedule" class="ml-auto flex items-center gap-2 text-sm">
@@ -188,7 +213,11 @@ const { t } = useInterfaceLanguage();
             <SecondaryButton aria-label="Next week" @click="weekOffset++">›</SecondaryButton>
         </div>
     </div>
-    <div class="flow-root overflow-x-auto">
+    <ProjectTaskHistory
+        v-if="allowHistory && view === 'history' && projectId"
+        :project-id="projectId"
+        :tasks="historyTasks ?? tasks" />
+    <div v-else class="flow-root overflow-x-auto">
         <div class="inline-block min-w-full align-middle">
             <div
                 data-testid="task_table"
@@ -254,6 +283,7 @@ const { t } = useInterfaceLanguage();
                         v-for="task in group.tasks"
                         :key="task.id"
                         :task="task"
+                        :task-category="categoryMap.get(task.category_id ?? '')"
                         :timer="timersByTask.get(task.id)"
                         :timer-ready="ready"
                         :now="now"
