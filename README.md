@@ -1,62 +1,45 @@
-# solidtime - The modern Open-Source TimeTracker
+# Add project history and editable task categories
 
-[![GitHub License](https://img.shields.io/github/license/solidtime-io/solidtime?style=flat-square)](https://github.com/solidtime-io/solidtime/blob/main/LICENSE.md)
-[![Codecov](https://img.shields.io/codecov/c/github/solidtime-io/solidtime?style=flat-square&logo=codecov)](https://codecov.io/gh/solidtime-io/solidtime)
-![GitHub Actions Unit Tests Status](https://img.shields.io/github/actions/workflow/status/solidtime-io/solidtime/phpunit.yml?style=flat-square)
-![PHPStan badge](https://img.shields.io/badge/PHPStan-Level_7-blue?style=flat-square&color=blue)
+## Problem
 
-![Screenshot of the solidtime application with header: solidtime - The modern Open-Source Time Tracker](docs/solidtime-banner.png "solidtime Banner")
+A time entry explains when work happened, but it does not show how a task evolved: which problem appeared, what was investigated, which attempts failed, and how the result was verified. Task names and free-form Calendar notes are difficult to follow across multiple work sessions.
 
-solidtime is a modern open-source time tracking application for Freelancers and Agencies.
+## Proposed change
 
-## Features
+Add a **History** view beside the existing task List and Schedule views on a project page. It connects task records into an explicit, chronological story while keeping the existing task and timer workflows available.
 
- - Time tracking: Track your time with a modern and easy-to-use interface
- - Projects: Create and manage projects and assign project members
- - Tasks: Create and manage tasks and assign tasks to projects
- - Clients: Create and manage clients and assign clients to projects
- - Billable rates: Set billable rates for projects, project members, organization members and organizations 
- - Multiple organizations: Create and manage multiple organizations with one account
- - Roles and permissions: Create and manage organizations
- - Import: Import your time tracking data from other time tracking applications (Supported: Toggl, Clockify, Timeentry CSV)
+- Browse all project tasks, including completed and canceled tasks, grouped by category or optional stage.
+- Create organization-wide categories with editable names, colors, display order, and archive status. Existing tasks stay uncategorized until assigned; archiving retains existing assignments.
+- Capture Progress, Problem, Investigation, Attempt, Finding, Action, and Verification records with Markdown notes and an occurrence date.
+- Link a record to a problem and a preceding record within the same task. Mark unsuccessful attempts, resolved problems, and verified outcomes without overwriting the investigation.
+- Link an accessible Calendar event, or explicitly copy its title, notes, and date into a new record. Existing Calendar notes are not automatically classified or rewritten.
+- Search the timeline, filter open or resolved problems, and inspect the selected record, its relationships, and Calendar source.
+- Edit or delete records with version checks. A record with dependent links must be relinked before deletion.
 
-## Self Hosting
+## Screenshots
 
-If you are looking into self-hosting solidtime, you can find the guides [here](https://docs.solidtime.io/self-hosting/intro)
+Screenshots below are captured from the actual local application with sample data.
 
-We also have an examples repository [here](https://github.com/solidtime-io/self-hosting-examples)
+### Task explorer, investigation timeline, and record details
 
-If you do not want to self-host solidtime or try it out you can sign up for [solidtime cloud](https://www.solidtime.io/)
+![Project history showing editable task categories, a failed attempt, and a verified result](.github/feature-images/project-history-timeline.png)
 
-## Issues & Feature Requests
+### Editable task categories
 
-If you 
-* find any **bugs in solidtime**, please feel free to [**open an issue**](https://github.com/solidtime-io/solidtime/issues/new) in this repository, with instructions on how to reproduce the bug. 
-* have a **feature request**, please [**create a discussion**](https://github.com/solidtime-io/solidtime/discussions/new?category=feature-requests) in this repository.
+![Category manager with name, color, order, and archive controls](.github/feature-images/project-history-categories.png)
 
+## Validation
 
-> **Do not use AI-generated text in issues, discussions and PR descriptions.**
->
-> We are human, so please write in natural language in your issues, discussions, and PR descriptions.
-> Don't be a meatproxy. We will ban people who repeatedly violate this rule from further communication on our repositories.
+Verified locally on 2026-11-24 against an isolated PostgreSQL sample database.
 
+- PostgreSQL migration applied successfully to a local preview database.
+- PHP endpoint tests: **6 tests, 107 assertions passed**, covering category organization scoping, archive behavior, task field persistence, private-project and Calendar permissions, record relationships and chronology, version conflicts, dependent-record deletion, and existing Stop/Pause timer behavior.
+- Vue TypeScript checks and the production frontend build passed.
+- Endpoint command: `vendor/bin/phpunit --filter "TaskHistoryEndpointTest|TaskTimerEndpointTest" tests/Unit/Endpoint/Api/V1`.
+- Real local browser checks covered category editing, record creation/editing/deletion, refresh persistence, open/resolved filtering, Markdown sanitization, the existing task List and Schedule views, and Start/Stop controls. Additional checks verified Continue thread links, category/stage assignment from the task form, failed-save draft retention, and the responsive mobile layout.
 
-## Contributing
+## Scope and compatibility
 
-Please open an issue or start a discussion and wait for approval before submitting a pull request. This does not apply to tiny fixes or changes however, please keep in mind that we might not merge PRs for various reasons. 
+This adds task-category and history tables, plus nullable category and stage fields on tasks. History is explicit and user-authored; it does not infer causal relationships from old notes. Category management follows the existing tag-management permissions, history follows task permissions, and Calendar sources retain their existing access restrictions. No production database or deployment was changed for this preview.
 
-**If you submit an AI slop pull request (especially without following the proper procedure), you will be banned from future contributions to solidtime.**
-
-To keep that manageable, pull requests from authors who are not vouched are closed automatically, unless they change 50 lines or fewer. To get vouched, open an issue or discussion first and explain how you intend to implement the change. Once we have agreed on the approach, we vouch for you. See [Vouched contributors](./CONTRIBUTING.md#vouched-contributors).
-
-Please read the [CONTRIBUTING.md](./CONTRIBUTING.md) before sumbitting a Pull Request.
-
-We do accept contributions in the [documentation repository](https://github.com/solidtime-io/docs) f.e. to add new self-hosting guides.
-
-## Security
-
-Looking to report a vulnerability? Please refer our [SECURITY.md](./SECURITY.md) file.
-
-## License
-
-This project is open-source and available under the GNU Affero General Public License v3.0 (AGPL v3). Please see the [license file](LICENSE.md) for more information.
+[Upstream project README](https://github.com/solidtime-io/solidtime/blob/main/README.md)
