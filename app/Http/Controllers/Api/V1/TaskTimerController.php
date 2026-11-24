@@ -53,7 +53,7 @@ class TaskTimerController extends Controller
         abort_unless($visible || $this->hasPermission($organization, 'projects:view:all'), 403);
 
         $input = $request->validate([
-            'action' => 'required|in:start,pause,resume,complete',
+            'action' => 'required|in:start,stop,pause,resume,complete',
             'session_id' => 'required_unless:action,start|uuid',
             'version' => 'required|integer|min:0',
             'description' => 'sometimes|required|string|max:5000',
@@ -111,22 +111,23 @@ class TaskTimerController extends Controller
                     $session->segments = [...$session->segments, [
                         'start' => $session->started_at->timestamp,
                         'end' => $now->timestamp,
-                        'markdown_notes' => $action === 'pause' ? ($input['markdown_notes'] ?? null) : null,
+                        'markdown_notes' => null,
                     ]];
                 }
                 abort_if($action === 'pause' && $now->lte($session->started_at) && isset($input['markdown_notes']), 422, 'Let the timer run for at least one second before saving notes.');
                 $session->started_at = null;
             }
 
-            if ($action === 'resume') {
+            if ($action === 'resume' || $action === 'stop') {
                 $session->version++;
                 $session->save();
 
                 return 0;
             }
 
+            abort_if($action === 'pause' && $session->segments === [], 422, 'There is no pending timer time to save.');
             $description = $input['description'] ?? $task->name;
-            $count = $this->saveEntries($organization, $member, $project, $task, $session, $description, $action === 'complete' ? ($input['markdown_notes'] ?? null) : null);
+            $count = $this->saveEntries($organization, $member, $project, $task, $session, $description, $input['markdown_notes'] ?? null);
             $task->setComputedAttributeValue('spent_time');
             if ($action === 'pause') {
                 $task->save();

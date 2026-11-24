@@ -14,7 +14,7 @@ export type TaskTimer = {
     elapsed_seconds: number;
 };
 
-export type TaskTimerAction = 'start' | 'pause' | 'resume' | 'complete';
+export type TaskTimerAction = 'start' | 'stop' | 'pause' | 'resume' | 'complete';
 
 export type TaskTimerCompletion = {
     description?: string;
@@ -72,10 +72,8 @@ export function useTaskTimers() {
             const response = await notifications.handleApiRequestNotifications(() =>
                 axios.post<{ saved_entries: number }>(`${endpoint(organization)}/${taskId}`, body)
             );
-            if (
-                response &&
-                (action === 'complete' || (action === 'pause' && response.data.saved_entries > 0))
-            ) {
+            if (!response) throw new Error('The timer action was not saved.');
+            if (action === 'complete' || (action === 'pause' && response.data.saved_entries > 0)) {
                 const count = response.data.saved_entries;
                 notifications.addNotification(
                     'success',
