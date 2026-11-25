@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 import type { TaskCategory } from '@/utils/useTaskHistory';
 import type { Task } from '@/packages/api/src';
 import { PlayIcon, StopIcon } from '@heroicons/vue/20/solid';
@@ -161,6 +162,7 @@ async function changeTimer(action: TaskTimerAction, completion?: TaskTimerComple
 const organization = inject<ComputedRef<Organization>>('organization');
 
 const today = computed(() => getLocalizedDayJs().format('YYYY-MM-DD'));
+const { t } = useInterfaceLanguage();
 const overdue = computed(
     () =>
         !!props.task.due_date &&
@@ -254,6 +256,9 @@ const showTaskEditModal = ref(false);
                 }}</span>
                 <span v-if="overdue" class="text-xs">· Overdue</span>
             </template>
+            <span v-else-if="task.start_date && !task.is_done && !task.is_canceled">
+                {{ t('Ongoing') }}
+            </span>
             <span v-else class="text-text-tertiary">—</span>
         </div>
         <div

@@ -6,6 +6,8 @@ import { Field, FieldLabel } from '@/packages/ui/src/field';
 import { CalendarIcon, ChevronDown } from '@lucide/vue';
 import { CalendarDaysIcon } from '@heroicons/vue/20/solid';
 import { Popover, PopoverContent, PopoverTrigger } from '@/packages/ui/src/popover';
+import { Calendar } from '@/packages/ui/src/calendar';
+import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 import { RangeCalendar } from '@/packages/ui/src/range-calendar';
 import { firstDayIndex, formatDate, type WeekStartDay } from '@/packages/ui/src/utils/time';
 import type { Organization } from '@/packages/api/src';
@@ -17,18 +19,24 @@ const dates = defineModel<{ start_date: string | null; due_date: string | null }
 const triggerId = useId();
 const draftDates = shallowRef<DateRange>({ start: undefined, end: undefined });
 const datePickerOpen = ref(false);
+const ongoing = ref(false);
+const ongoingStart = shallowRef<DateRange['start']>();
+const { t } = useInterfaceLanguage();
 const organization = inject<ComputedRef<Organization>>('organization');
 const weekStartsOn = computed(() => firstDayIndex.value as WeekStartDay);
 const dateRangeLabel = computed(() => {
     const { start_date: start, due_date: end } = dates.value;
-    if (!start || !end) return 'Start date → Due date';
     const dateFormat = organization?.value.date_format;
+    if (start && !end) return formatDate(start, dateFormat) + ' → ' + t('Ongoing');
+    if (!start || !end) return 'Start date → Due date';
     return formatDate(start, dateFormat) + ' → ' + formatDate(end, dateFormat);
 });
 
 function updateDatePickerOpen(open: boolean) {
     if (open) {
         const { start_date: start, due_date: end } = dates.value;
+        ongoing.value = Boolean(start && !end);
+        ongoingStart.value = start ? parseDate(start) : undefined;
         draftDates.value = {
             start: start ? parseDate(start) : undefined,
             end: end ? parseDate(end) : undefined,
@@ -37,10 +45,35 @@ function updateDatePickerOpen(open: boolean) {
     datePickerOpen.value = open;
 }
 
+function toggleOngoing() {
+    if (ongoing.value) {
+        draftDates.value = {
+            start: ongoingStart.value,
+            end:
+                draftDates.value.start?.toString() === ongoingStart.value?.toString()
+                    ? draftDates.value.end
+                    : undefined,
+        };
+    } else {
+        ongoingStart.value = draftDates.value.start;
+    }
+    ongoing.value = !ongoing.value;
+}
+
+const canApply = computed(() =>
+    ongoing.value
+        ? Boolean(ongoingStart.value)
+        : Boolean(draftDates.value.start && draftDates.value.end)
+);
+
 function applyTaskDates() {
-    const { start, end } = draftDates.value;
-    if (!start || !end) return;
-    dates.value = { start_date: start.toString(), due_date: end.toString() };
+    if (!canApply.value) return;
+    dates.value = ongoing.value
+        ? { start_date: ongoingStart.value!.toString(), due_date: null }
+        : {
+              start_date: draftDates.value.start!.toString(),
+              due_date: draftDates.value.end!.toString(),
+          };
     datePickerOpen.value = false;
 }
 
@@ -64,7 +97,7 @@ function clearTaskDates() {
                         <CalendarIcon class="size-4 shrink-0 text-icon-default" />
                         <span
                             class="truncate tabular-nums"
-                            :class="{ 'text-text-tertiary': !dates.due_date }">
+                            :class="{ 'text-text-tertiary': !dates.start_date }">
                             {{ dateRangeLabel }}
                         </span>
                     </span>
@@ -73,12 +106,26 @@ function clearTaskDates() {
             </PopoverTrigger>
             <PopoverContent align="start" class="w-auto p-0">
                 <div class="border-b border-border px-3 py-2.5">
-                    <p class="text-sm font-medium">Start date → Due date</p>
-                    <p class="mt-0.5 text-xs text-text-tertiary">
-                        Select a start date, then a due date.
+                    <label class="flex cursor-pointer items-center gap-2 text-sm font-medium">
+                        <input type="checkbox" :checked="ongoing" @change="toggleOngoing" />
+                        {{ t('Ongoing') }}
+                    </label>
+                    <p class="mt-1 text-xs text-text-secondary">
+                        {{
+                            ongoing
+                                ? t('Select a start date. No due date is needed.')
+                                : t('Select a start date, then a due date.')
+                        }}
                     </p>
                 </div>
+                <Calendar
+                    v-if="ongoing"
+                    v-model="ongoingStart"
+                    prevent-deselect
+                    initial-focus
+                    :week-starts-on="weekStartsOn" />
                 <RangeCalendar
+                    v-else
                     v-model="draftDates"
                     class="task-date-calendar"
                     initial-focus
@@ -88,15 +135,11 @@ function clearTaskDates() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        :disabled="!dates.due_date && !draftDates.start"
+                        :disabled="!dates.start_date && !draftDates.start && !ongoingStart"
                         @click="clearTaskDates">
                         Clear
                     </Button>
-                    <Button
-                        type="button"
-                        size="sm"
-                        :disabled="!draftDates.start || !draftDates.end"
-                        @click="applyTaskDates">
+                    <Button type="button" size="sm" :disabled="!canApply" @click="applyTaskDates">
                         Apply
                     </Button>
                 </div>

@@ -421,6 +421,13 @@ class TaskEndpointTest extends ApiEndpointTestAbstract
             ->assertJsonPath('data.due_date', $dates['due_date']);
         $this->putJson($update, ['name' => 'Schedule demo', 'start_date' => '2026-11-16', 'due_date' => '2026-11-15'])
             ->assertUnprocessable()->assertJsonValidationErrors('due_date');
+        $this->postJson($store, $body + ['start_date' => $dates['start_date']])->assertCreated()
+            ->assertJsonPath('data.start_date', $dates['start_date'])->assertJsonPath('data.due_date', null);
+        $this->putJson($update, ['name' => 'Schedule demo', 'start_date' => $dates['start_date'], 'due_date' => null])
+            ->assertOk()->assertJsonPath('data.start_date', $dates['start_date'])->assertJsonPath('data.due_date', null);
+        $this->assertDatabaseHas(Task::class, ['id' => $id, 'start_date' => $dates['start_date'], 'due_date' => null]);
+        $this->putJson($update, ['name' => 'Schedule demo'] + $dates)
+            ->assertOk()->assertJsonPath('data.due_date', $dates['due_date']);
         $this->putJson($update, ['name' => 'Schedule demo', 'start_date' => null, 'due_date' => null])
             ->assertOk()->assertJsonPath('data.start_date', null)->assertJsonPath('data.due_date', null);
         $this->assertDatabaseHas(Task::class, ['id' => $id, 'start_date' => null, 'due_date' => null]);

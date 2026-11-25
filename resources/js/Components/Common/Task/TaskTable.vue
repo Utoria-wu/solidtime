@@ -314,7 +314,13 @@ const { t } = useInterfaceLanguage();
                                             getDayJsInstance()(task.due_date).format('MMM D, YYYY')
                                         }}
                                     </template>
-                                    <template v-if="!task.start_date && !task.due_date">{{
+                                    <template
+                                        v-else-if="
+                                            task.start_date && !task.is_done && !task.is_canceled
+                                        ">
+                                        {{ ' → ' + t('Ongoing') }}
+                                    </template>
+                                    <template v-else-if="!task.start_date">{{
                                         t('No dates set')
                                     }}</template>
                                     <span v-if="scheduleProjects && task.is_done">

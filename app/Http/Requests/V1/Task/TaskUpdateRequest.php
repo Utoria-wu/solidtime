@@ -46,7 +46,7 @@ class TaskUpdateRequest extends BaseFormRequest
             'completion_notes' => ['nullable', 'string', 'max:10000'],
             'markdown_notes' => ['nullable', 'string', 'max:10000'],
             'start_date' => ['present_with:due_date', 'required_with:due_date', 'nullable', 'date_format:Y-m-d'],
-            'due_date' => ['present_with:start_date', 'required_with:start_date', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            'due_date' => ['present_with:start_date', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             // Estimated time in seconds
             'estimated_time' => [
                 'nullable',

@@ -3,6 +3,7 @@ import type { Task } from '@/packages/api/src';
 import { computed } from 'vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/packages/ui/src';
 import { getDayJsInstance } from '@/packages/ui/src/utils/time';
+import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 
 const props = defineProps<{
     dates: string[];
@@ -12,12 +13,18 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ open: [] }>();
+const { t } = useInterfaceLanguage();
+const ongoing = computed(() => {
+    const task = props.task;
+    return Boolean(task?.start_date && !task.due_date && !task.is_done && !task.is_canceled);
+});
 const dateLabel = computed(() => {
     const format = (date: string) => getDayJsInstance()(date).format('MMM D, YYYY');
     const start = props.task?.start_date;
     const due = props.task?.due_date;
     if (start && due && start !== due) return format(start) + ' – ' + format(due);
     if (due) return 'Due ' + format(due);
+    if (start && ongoing.value) return format(start) + ' → ' + t('Ongoing');
     return start ? 'Starts ' + format(start) : '';
 });
 
@@ -25,18 +32,18 @@ const mark = computed(() => {
     const start = props.task?.start_date;
     const due = props.task?.due_date;
     const first = start || due;
-    const last = due || start;
     const weekStart = props.dates[0];
     const weekEnd = props.dates.at(-1);
+    const last = ongoing.value ? weekEnd : due || start;
     if (!first || !last || !weekStart || !weekEnd || last < weekStart || first > weekEnd) {
         return null;
     }
     const startsBefore = first < weekStart;
-    const endsAfter = last > weekEnd;
+    const endsAfter = ongoing.value || last > weekEnd;
     return {
         from: startsBefore ? 1 : props.dates.indexOf(first) + 1,
         to: endsAfter ? props.dates.length + 1 : props.dates.indexOf(last) + 2,
-        point: first === last,
+        point: !ongoing.value && first === last,
         startsBefore,
         endsAfter,
         deadline: Boolean(due) && !endsAfter,
