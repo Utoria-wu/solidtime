@@ -545,12 +545,12 @@ async function destroy() {
 }
 .record-wrap {
     position: relative;
-    padding-bottom: 12px;
+    padding-bottom: 8px;
 }
 .record-wrap:before {
     content: '';
     position: absolute;
-    top: 22px;
+    top: 24px;
     left: calc(-21px - var(--record-indent, 0px));
     width: calc(20px + var(--record-indent, 0px));
     border-top: 1px solid color-mix(in srgb, var(--record-color) 25%, transparent);
@@ -561,22 +561,17 @@ async function destroy() {
     gap: 12px;
     text-align: left;
     width: 100%;
-    padding: 14px;
-    border: 1px solid color-mix(in srgb, var(--record-color) 18%, #e9eaec);
-    border-radius: 10px;
-    background: linear-gradient(
-        110deg,
-        color-mix(in srgb, var(--record-color) 5%, var(--theme-color-default-background, white)),
-        var(--theme-color-default-background, white) 65%
-    );
-    transition:
-        border-color 0.15s,
-        box-shadow 0.15s;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    transition: background-color 0.15s;
 }
-.record-card:hover,
+.record-card:hover {
+    background: color-mix(in srgb, var(--record-color) 4%, transparent);
+}
 .record-card.selected {
-    border-color: color-mix(in srgb, var(--record-color) 60%, #dce0e2);
-    box-shadow: 0 2px 7px #11182706;
+    background: color-mix(in srgb, var(--record-color) 6%, transparent);
 }
 .record-icon {
     display: flex;
@@ -586,7 +581,7 @@ async function destroy() {
     height: 28px;
     flex-shrink: 0;
     color: var(--record-color);
-    border-radius: 8px;
+    border-radius: 50%;
     background: color-mix(in srgb, var(--record-color) 10%, transparent);
 }
 .outcome {
