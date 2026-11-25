@@ -301,7 +301,6 @@ const showTaskEditModal = ref(false);
                 v-if="showTimerButton"
                 type="button"
                 class="inline-flex size-8 items-center justify-center rounded-md text-text-primary hover:bg-tertiary disabled:opacity-50"
-                :class="{ 'bg-teal-500/10': timer?.started_at != null }"
                 :disabled="saving"
                 :title="
                     timer

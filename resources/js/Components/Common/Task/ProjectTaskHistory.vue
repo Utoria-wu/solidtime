@@ -26,7 +26,6 @@ import TaskCategoryManager from './TaskCategoryManager.vue';
 const props = defineProps<{ projectId: string; tasks: Task[] }>();
 const { categories, isError: categoryError } = useTaskCategories();
 const legacy = useTaskHistory(props.projectId);
-const search = ref('');
 const selectedTask = ref<string | null>(null);
 const groupBy = ref<'category' | 'stage'>('category');
 const collapsed = ref(new Set<string>());
@@ -145,16 +144,8 @@ const taskCounts = computed(() => {
 
 const days = computed(() => {
     const result = new Map<string, Record[]>();
-    const term = search.value.trim().toLocaleLowerCase();
     for (const record of records.value) {
         if (selectedTask.value && record.task.id !== selectedTask.value) continue;
-        if (
-            term &&
-            !`${record.task.name} ${record.note ?? ''} ${record.label}`
-                .toLocaleLowerCase()
-                .includes(term)
-        )
-            continue;
         const date = getLocalizedDayJs(record.date).format('YYYY-MM-DD');
         const day = result.get(date) ?? [];
         day.push(record);
@@ -195,16 +186,6 @@ function toggle(id: string) {
 
 <template>
     <div data-testid="project_history" class="overflow-hidden">
-        <header
-            class="flex flex-wrap items-center justify-between gap-3 border-b border-default-background-separator px-5 py-4">
-            <h2 class="font-semibold">Project history</h2>
-            <input
-                v-model="search"
-                aria-label="Search history"
-                type="search"
-                placeholder="Search history…"
-                class="w-44 rounded-lg border border-default-background-separator bg-transparent px-3 py-2 text-sm" />
-        </header>
         <div class="history-layout">
             <aside class="history-explorer border-r border-default-background-separator">
                 <div class="flex items-center justify-between px-4 py-4">
@@ -301,7 +282,7 @@ function toggle(id: string) {
                 <p
                     v-else-if="!days.size"
                     class="px-5 py-10 text-center text-sm text-text-secondary">
-                    {{ search.trim() ? 'No matching records' : 'No task activity yet' }}
+                    No task activity yet
                 </p>
                 <section v-for="[date, day] in days" :key="date" class="px-5 pb-3 pt-5">
                     <h3 class="mb-4 text-xs font-medium text-text-secondary">

@@ -4,6 +4,7 @@ import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import { PlusCircleIcon } from '@heroicons/vue/24/solid';
 import { PlusIcon } from '@heroicons/vue/16/solid';
 import { computed, ref, watch } from 'vue';
+import { TooltipProvider } from '@/packages/ui/src';
 import { getDayJsInstance, getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import { useTaskCategories } from '@/utils/useTaskHistory';
 import ProjectTaskHistory from './ProjectTaskHistory.vue';
@@ -218,128 +219,166 @@ const { t } = useInterfaceLanguage();
         v-if="allowHistory && view === 'history' && projectId"
         :project-id="projectId"
         :tasks="historyTasks ?? tasks" />
-    <div v-else class="flow-root overflow-x-auto">
-        <div class="inline-block min-w-full align-middle">
-            <div
-                data-testid="task_table"
-                role="table"
-                class="grid min-w-full"
-                :class="{ 'schedule-table': showSchedule }"
-                :style="{
-                    gridTemplateColumns: showSchedule
-                        ? 'minmax(13rem, 1fr) 5rem 5.75rem minmax(34rem, 2.5fr)'
-                        : 'minmax(10rem, 1fr) repeat(2, minmax(7.5rem, max-content)) 11rem minmax(80px, auto) minmax(95px, auto) 8rem 5.75rem',
-                    '--schedule-days': scheduleDays,
-                }">
-                <TaskTableHeading
-                    v-if="!showSchedule"
-                    :sort-column="sortColumn"
-                    :sort-direction="sortDirection"
-                    :desc-first-columns="descFirstColumns"
-                    @sort="handleSort"></TaskTableHeading>
-                <div v-else role="row" class="contents text-xs text-text-secondary">
-                    <div role="columnheader" class="px-4 py-3">{{ t('Task / Planned dates') }}</div>
-                    <div role="columnheader" class="px-3 py-3">{{ t('Timer') }}</div>
-                    <div role="columnheader"><span class="sr-only">Actions</span></div>
-                    <div role="columnheader" aria-label="Two-week timeline" class="schedule-days">
+    <TooltipProvider v-else :delay-duration="180">
+        <div class="flow-root overflow-x-auto">
+            <div class="inline-block min-w-full align-middle">
+                <div
+                    data-testid="task_table"
+                    role="table"
+                    class="grid min-w-full"
+                    :class="{ 'schedule-table': showSchedule }"
+                    :style="{
+                        gridTemplateColumns: showSchedule
+                            ? 'minmax(13rem, 1fr) 5rem 5.75rem minmax(34rem, 2.5fr)'
+                            : 'minmax(10rem, 1fr) repeat(2, minmax(7.5rem, max-content)) 11rem minmax(80px, auto) minmax(95px, auto) 8rem 5.75rem',
+                        '--schedule-days': scheduleDays,
+                    }">
+                    <TaskTableHeading
+                        v-if="!showSchedule"
+                        :sort-column="sortColumn"
+                        :sort-direction="sortDirection"
+                        :desc-first-columns="descFirstColumns"
+                        @sort="handleSort"></TaskTableHeading>
+                    <div v-else role="row" class="contents text-xs text-text-secondary">
+                        <div role="columnheader" class="px-4 py-3">
+                            {{ t('Task / Planned dates') }}
+                        </div>
+                        <div role="columnheader" class="px-3 py-3">{{ t('Timer') }}</div>
+                        <div role="columnheader"><span class="sr-only">Actions</span></div>
                         <div
-                            v-for="(day, index) in days"
-                            :key="weekDates[index]"
-                            class="schedule-day flex flex-col items-center justify-center gap-0.5 py-2"
-                            :class="{ 'schedule-today': weekDates[index] === today }"
-                            :aria-current="weekDates[index] === today ? 'date' : undefined"
-                            :title="day.format('dddd, MMM D, YYYY')">
-                            {{ day.format('dd') }}
-                            <strong
-                                class="schedule-date flex size-6 items-center justify-center rounded-md text-sm text-text-primary"
-                                >{{ day.format('D') }}</strong
-                            >
+                            role="columnheader"
+                            aria-label="Two-week timeline"
+                            class="schedule-days">
+                            <div
+                                v-for="(day, index) in days"
+                                :key="weekDates[index]"
+                                class="schedule-day flex flex-col items-center justify-center gap-0.5 py-2"
+                                :class="{ 'schedule-today': weekDates[index] === today }"
+                                :aria-current="weekDates[index] === today ? 'date' : undefined"
+                                :title="day.format('dddd, MMM D, YYYY')">
+                                {{ day.format('dd') }}
+                                <strong
+                                    class="schedule-date flex size-6 items-center justify-center rounded-md text-sm text-text-primary"
+                                    >{{ day.format('D') }}</strong
+                                >
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div v-if="sortedTasks.length === 0" class="col-span-full py-24 text-center">
-                    <PlusCircleIcon class="w-8 text-icon-default inline pb-2"></PlusCircleIcon>
-                    <h3 class="text-text-primary font-semibold">{{ t('No tasks found') }}</h3>
-                    <p v-if="projectId && canCreateTasks()" class="pb-5">
-                        Create your first task now!
-                    </p>
-                    <SecondaryButton
-                        v-if="projectId && canCreateTasks()"
-                        :icon="PlusIcon"
-                        @click="createTask = true"
-                        >Create your First Task
-                    </SecondaryButton>
-                </div>
-                <template v-for="group in rowGroups" :key="group.id">
-                    <div v-if="showSchedule" role="row" class="contents">
-                        <div
-                            role="cell"
-                            class="col-span-3 bg-tertiary px-4 py-2 text-xs font-semibold">
-                            {{ scheduleProjects ? group.label : t(group.label) }}
-                            <span class="ml-1 text-text-secondary">{{ group.tasks.length }}</span>
-                        </div>
-                        <TaskScheduleTrack :dates="weekDates" :today="today" aria-hidden="true" />
+                    <div v-if="sortedTasks.length === 0" class="col-span-full py-24 text-center">
+                        <PlusCircleIcon class="w-8 text-icon-default inline pb-2"></PlusCircleIcon>
+                        <h3 class="text-text-primary font-semibold">{{ t('No tasks found') }}</h3>
+                        <p v-if="projectId && canCreateTasks()" class="pb-5">
+                            Create your first task now!
+                        </p>
+                        <SecondaryButton
+                            v-if="projectId && canCreateTasks()"
+                            :icon="PlusIcon"
+                            @click="createTask = true"
+                            >Create your First Task
+                        </SecondaryButton>
                     </div>
-                    <TaskTableRow
-                        v-for="task in group.tasks"
-                        :key="task.id"
-                        :task="task"
-                        :task-category="categoryMap.get(task.category_id ?? '')"
-                        :timer="timersByTask.get(task.id)"
-                        :timer-ready="ready"
-                        :now="now"
-                        :change="change"
-                        @open-activity="openActivity(task)">
-                        <template v-if="showSchedule" #planned-dates>
-                            <span class="text-xs font-normal text-text-secondary">
-                                <template v-if="task.start_date">{{
-                                    getDayJsInstance()(task.start_date).format('MMM D, YYYY')
-                                }}</template>
-                                <template v-if="task.due_date">
-                                    {{ task.start_date ? ' → ' : 'Due '
-                                    }}{{ getDayJsInstance()(task.due_date).format('MMM D, YYYY') }}
-                                </template>
-                                <template v-if="!task.start_date && !task.due_date">{{
-                                    t('No dates set')
-                                }}</template>
-                                <span v-if="scheduleProjects && task.is_done">
-                                    · {{ t('Done') }}</span
-                                >
-                                <span
-                                    v-else-if="taskGroup(task) === 'overdue'"
-                                    class="text-red-500">
-                                    · Overdue</span
-                                >
-                            </span>
-                        </template>
-                        <template v-if="showSchedule" #timeline>
+                    <template v-for="group in rowGroups" :key="group.id">
+                        <div v-if="showSchedule" role="row" class="contents">
+                            <div
+                                role="cell"
+                                class="schedule-group-label col-span-3 px-4 py-2.5 text-xs font-medium text-text-secondary">
+                                {{ scheduleProjects ? group.label : t(group.label) }}
+                                <span class="ml-1 text-text-secondary">{{
+                                    group.tasks.length
+                                }}</span>
+                            </div>
                             <TaskScheduleTrack
+                                class="schedule-group-track"
                                 :dates="weekDates"
                                 :today="today"
-                                :task="task"
-                                :tone="task.is_done ? 'done' : taskGroup(task)" />
-                        </template>
-                    </TaskTableRow>
-                </template>
+                                aria-hidden="true" />
+                        </div>
+                        <TaskTableRow
+                            v-for="task in group.tasks"
+                            :key="task.id"
+                            :task="task"
+                            :task-category="categoryMap.get(task.category_id ?? '')"
+                            :timer="timersByTask.get(task.id)"
+                            :timer-ready="ready"
+                            :now="now"
+                            :change="change"
+                            @open-activity="openActivity(task)">
+                            <template v-if="showSchedule" #planned-dates>
+                                <span class="text-xs font-normal text-text-secondary">
+                                    <template v-if="task.start_date">{{
+                                        getDayJsInstance()(task.start_date).format('MMM D, YYYY')
+                                    }}</template>
+                                    <template v-if="task.due_date">
+                                        {{ task.start_date ? ' → ' : 'Due '
+                                        }}{{
+                                            getDayJsInstance()(task.due_date).format('MMM D, YYYY')
+                                        }}
+                                    </template>
+                                    <template v-if="!task.start_date && !task.due_date">{{
+                                        t('No dates set')
+                                    }}</template>
+                                    <span v-if="scheduleProjects && task.is_done">
+                                        · {{ t('Done') }}</span
+                                    >
+                                    <span
+                                        v-else-if="taskGroup(task) === 'overdue'"
+                                        class="text-red-500">
+                                        · Overdue</span
+                                    >
+                                </span>
+                            </template>
+                            <template v-if="showSchedule" #timeline>
+                                <TaskScheduleTrack
+                                    :dates="weekDates"
+                                    :today="today"
+                                    :task="task"
+                                    :tone="task.is_done ? 'done' : taskGroup(task)"
+                                    @open="openActivity(task)" />
+                            </template>
+                        </TaskTableRow>
+                    </template>
+                </div>
             </div>
         </div>
-    </div>
+    </TooltipProvider>
 </template>
 
 <style scoped>
 .schedule-table {
-    overflow: hidden;
-    border: 1px solid var(--theme-color-default-background-separator);
-    border-radius: 0.75rem;
+    --schedule-line: color-mix(
+        in oklch,
+        var(--theme-color-default-background-separator) 46%,
+        transparent
+    );
+    --schedule-week-line: color-mix(
+        in oklch,
+        var(--theme-color-default-background-separator) 82%,
+        transparent
+    );
+    --schedule-today: color-mix(in oklch, #70b3cf 38%, transparent);
+    border-top: 1px solid var(--theme-color-default-background-separator);
+}
+.schedule-group-label,
+.schedule-group-track {
+    border-top: 1px solid var(--schedule-week-line);
 }
 .schedule-days {
     display: grid;
     grid-template-columns: repeat(var(--schedule-days), minmax(0, 1fr));
 }
+.schedule-day {
+    border-inline-start: 1px solid var(--schedule-line);
+}
 .schedule-day:nth-child(7n + 1) {
-    border-inline-start: 1px solid var(--theme-color-default-background-separator);
+    border-inline-start-color: var(--schedule-week-line);
+}
+.schedule-day:nth-child(7n),
+.schedule-day:nth-child(7n - 1) {
+    color: var(--theme-color-text-tertiary);
 }
 .schedule-today .schedule-date {
-    background: color-mix(in oklch, #70b3cf 20%, var(--theme-color-default-background));
+    color: var(--theme-color-text-primary);
+    border: 1px solid var(--schedule-today);
+    border-radius: 9999px;
 }
 </style>
