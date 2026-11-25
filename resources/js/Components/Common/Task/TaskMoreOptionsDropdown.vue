@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
     TrashIcon,
+    PauseIcon,
     PencilSquareIcon,
     CheckCircleIcon,
     XCircleIcon,
@@ -12,10 +13,12 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/packages/ui/src';
 
 const emit = defineEmits<{
+    pause: [];
     delete: [];
     edit: [];
     done: [];
@@ -23,6 +26,8 @@ const emit = defineEmits<{
 }>();
 const props = defineProps<{
     task: Task;
+    canPauseTimer?: boolean;
+    busy?: boolean;
 }>();
 </script>
 
@@ -30,12 +35,11 @@ const props = defineProps<{
     <DropdownMenu>
         <DropdownMenuTrigger as-child>
             <button
-                class="focus-visible:outline-none focus-visible:bg-card-background rounded-full focus-visible:ring-2 focus-visible:ring-ring focus-visible:opacity-100 hover:bg-card-background group-hover:opacity-100 opacity-20 transition-opacity text-text-secondary"
+                type="button"
+                class="inline-flex size-8 items-center justify-center rounded-md text-text-secondary hover:bg-tertiary focus-visible:ring-2 focus-visible:ring-ring"
+                :disabled="busy"
                 :aria-label="'Actions for Task ' + props.task.name">
-                <svg
-                    class="h-8 w-8 p-1 rounded-full"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg">
+                <svg class="size-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path
                         fill="none"
                         stroke="currentColor"
@@ -48,13 +52,11 @@ const props = defineProps<{
         </DropdownMenuTrigger>
         <DropdownMenuContent class="min-w-[150px]" align="end">
             <DropdownMenuItem
-                v-if="canUpdateTasks()"
-                :aria-label="'Edit Task ' + props.task.name"
-                data-testid="task_edit"
-                class="flex items-center space-x-3 cursor-pointer"
-                @click="emit('edit')">
-                <PencilSquareIcon class="w-5 text-icon-active" />
-                <span>Edit</span>
+                v-if="canPauseTimer"
+                class="flex items-center gap-3 cursor-pointer"
+                @click="emit('pause')">
+                <PauseIcon class="w-5 text-icon-active" />
+                <span>Pause and save to Calendar</span>
             </DropdownMenuItem>
             <DropdownMenuItem
                 v-if="canUpdateTasks() && !props.task.is_canceled"
@@ -68,6 +70,17 @@ const props = defineProps<{
                 <CheckCircleIcon class="w-5 text-icon-active" />
                 <span v-if="props.task.is_done">Mark as active</span>
                 <span v-else>Mark as done</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator
+                v-if="canUpdateTasks() && (canPauseTimer || !task.is_canceled)" />
+            <DropdownMenuItem
+                v-if="canUpdateTasks()"
+                :aria-label="'Edit Task ' + props.task.name"
+                data-testid="task_edit"
+                class="flex items-center space-x-3 cursor-pointer"
+                @click="emit('edit')">
+                <PencilSquareIcon class="w-5 text-icon-active" />
+                <span>Edit</span>
             </DropdownMenuItem>
             <DropdownMenuItem
                 v-if="canUpdateTasks() && !props.task.is_done"
