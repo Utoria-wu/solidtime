@@ -43,6 +43,7 @@ class TaskUpdateRequest extends BaseFormRequest
             // Both dates must be sent together. Send both as null to clear them.
             'category_id' => ['nullable', 'uuid', Rule::exists('task_categories', 'id')->where('organization_id', $this->organization->id)->where(fn ($query) => $query->whereNull('archived_at')->orWhere('id', $this->task?->category_id))],
             'stage' => ['nullable', 'string', 'max:100'],
+            'completion_notes' => ['nullable', 'string', 'max:10000'],
             'markdown_notes' => ['nullable', 'string', 'max:10000'],
             'start_date' => ['present_with:due_date', 'required_with:due_date', 'nullable', 'date_format:Y-m-d'],
             'due_date' => ['present_with:start_date', 'required_with:start_date', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],

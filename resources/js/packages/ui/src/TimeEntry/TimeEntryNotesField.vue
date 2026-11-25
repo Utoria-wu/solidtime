@@ -55,9 +55,6 @@ const renderedNotes = computed(() =>
             <div v-if="notes?.trim()" v-html="renderedNotes"></div>
             <p v-else class="text-text-tertiary">Nothing to preview yet.</p>
         </div>
-        <p class="text-xs text-text-tertiary">
-            Markdown supported · Headings, checklists, links, and more.
-        </p>
     </Field>
 </template>
 

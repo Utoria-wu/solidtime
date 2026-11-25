@@ -32,6 +32,7 @@ class TaskResource extends BaseResource
             'is_canceled' => $this->resource->canceled_at !== null,
             /** ID of the project */
             'project_id' => $this->resource->project_id,
+            'completion_notes' => $this->resource->completion_notes,
             'markdown_notes' => $this->resource->markdown_notes,
             /** First day of the planned task range (YYYY-MM-DD) */
             'start_date' => $this->resource->start_date?->toDateString(),

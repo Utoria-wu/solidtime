@@ -175,6 +175,9 @@ class TaskController extends Controller
             }
             if ($request->has('is_done')) {
                 abort_if($lockedTask->canceled_at !== null, 422, 'Restore this task before changing its completion status.');
+                if ($request->getIsDone() && $request->has('completion_notes')) {
+                    $lockedTask->completion_notes = $request->validated('completion_notes');
+                }
                 $lockedTask->done_at = $request->getIsDone() ? ($lockedTask->done_at ?? Carbon::now()) : null;
             }
             $lockedTask->save();

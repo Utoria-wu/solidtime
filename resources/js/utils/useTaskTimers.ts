@@ -19,6 +19,7 @@ export type TaskTimerAction = 'start' | 'stop' | 'pause' | 'resume' | 'complete'
 export type TaskTimerCompletion = {
     description?: string;
     markdown_notes: string | null;
+    completion_notes?: string | null;
 };
 
 export function elapsedTaskSeconds(timer: TaskTimer, now: number) {
