@@ -55,12 +55,15 @@ const dialogAction = ref<'pause' | 'complete'>('complete');
 const pauseVersion = ref<number | null>(null);
 const eventName = ref('');
 const notes = ref<string | null>(null);
-const canPauseTimer = computed(
+const showPauseTimer = computed(
     () =>
         !props.task.is_canceled &&
         props.timerReady &&
         !!props.timer &&
         (props.timer.started_at !== null || props.timer.elapsed_seconds > 0)
+);
+const canPauseTimer = computed(
+    () => showPauseTimer.value && !!props.timer && elapsedTaskSeconds(props.timer, props.now) > 0
 );
 const showTimerButton = computed(
     () =>
@@ -96,7 +99,7 @@ function handleTimerButton() {
 }
 
 async function openPause() {
-    if (!props.timer || saving.value) return;
+    if (!canPauseTimer.value || !props.timer || saving.value) return;
     const sessionId = props.timer.id;
     if (props.timer.started_at !== null && !(await changeTimer('stop'))) return;
     await nextTick();
@@ -317,10 +320,11 @@ const showTaskEditModal = ref(false);
                 <StopIcon v-if="timer?.started_at" class="size-4" />
                 <PlayIcon v-else class="size-4" />
             </button>
-            <div v-if="canDeleteTasks() || canUpdateTasks() || canPauseTimer" class="col-start-2">
+            <div v-if="canDeleteTasks() || canUpdateTasks() || showPauseTimer" class="col-start-2">
                 <TaskMoreOptionsDropdown
                     :task="task"
                     :can-pause-timer="canPauseTimer"
+                    :show-pause-timer="showPauseTimer"
                     :busy="saving"
                     @pause="openPause"
                     @done="markTaskAsDone"

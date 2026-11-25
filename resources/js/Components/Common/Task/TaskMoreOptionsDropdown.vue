@@ -27,6 +27,7 @@ const emit = defineEmits<{
 const props = defineProps<{
     task: Task;
     canPauseTimer?: boolean;
+    showPauseTimer?: boolean;
     busy?: boolean;
 }>();
 </script>
@@ -52,7 +53,8 @@ const props = defineProps<{
         </DropdownMenuTrigger>
         <DropdownMenuContent class="min-w-[150px]" align="end">
             <DropdownMenuItem
-                v-if="canPauseTimer"
+                v-if="showPauseTimer"
+                :disabled="!canPauseTimer"
                 class="flex items-center gap-3 cursor-pointer"
                 @click="emit('pause')">
                 <PauseIcon class="w-5 text-icon-active" />
@@ -72,7 +74,7 @@ const props = defineProps<{
                 <span v-else>Mark as done</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator
-                v-if="canUpdateTasks() && (canPauseTimer || !task.is_canceled)" />
+                v-if="canUpdateTasks() && (showPauseTimer || !task.is_canceled)" />
             <DropdownMenuItem
                 v-if="canUpdateTasks()"
                 :aria-label="'Edit Task ' + props.task.name"
