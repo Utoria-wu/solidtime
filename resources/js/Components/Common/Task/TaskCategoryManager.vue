@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useTaskCategories, type TaskCategory } from '@/utils/useTaskHistory';
 import { canCreateTags, canUpdateTags } from '@/utils/permissions';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
+const props = defineProps<{ categoryId?: string; selectOnSave?: boolean }>();
+const emit = defineEmits<{ saved: [category: TaskCategory] }>();
 const show = defineModel<boolean>('show', { default: false });
 const { categories, save } = useTaskCategories();
+const availableCategories = computed(() =>
+    categories.value.filter(
+        (item) => !props.selectOnSave || !item.is_archived || item.id === props.categoryId
+    )
+);
 const editing = ref<string>();
 const name = ref('');
 const color = ref('#5389b0');
@@ -21,29 +28,35 @@ function edit(item?: TaskCategory) {
     order.value = item?.sort_order ?? categories.value.length;
     archived.value = item?.is_archived ?? false;
 }
+watch(show, (open) => {
+    if (open) edit(categories.value.find((item) => item.id === props.categoryId));
+});
+
 async function submit() {
-    if (busy.value || !name.value.trim()) return;
+    if (busy.value || !name.value.trim() || !(editing.value ? canUpdateTags() : canCreateTags()))
+        return;
     busy.value = true;
     try {
-        if (
-            await save(
-                {
-                    name: name.value.trim(),
-                    color: color.value,
-                    sort_order: order.value,
-                    is_archived: archived.value,
-                },
-                editing.value
-            )
-        )
-            edit();
+        const saved = await save(
+            {
+                name: name.value.trim(),
+                color: color.value,
+                sort_order: order.value,
+                is_archived: archived.value,
+            },
+            editing.value
+        );
+        if (!saved) return;
+        emit('saved', saved);
+        if (props.selectOnSave) show.value = false;
+        else edit();
     } finally {
         busy.value = false;
     }
 }
 </script>
 <template>
-    <DialogModal :show="show" closeable @close="show = false" @submit="submit">
+    <DialogModal :show="show" :closeable="!busy" @close="show = false" @submit="submit">
         <template #title>Manage task categories</template>
         <template #content>
             <p class="mb-4 text-sm text-text-secondary">
@@ -52,7 +65,7 @@ async function submit() {
             <div
                 class="mb-5 max-h-52 overflow-auto rounded-lg border border-default-background-separator">
                 <button
-                    v-for="item in categories"
+                    v-for="item in availableCategories"
                     :key="item.id"
                     type="button"
                     class="flex w-full items-center gap-3 border-b border-default-background-separator px-4 py-3 text-left last:border-0 hover:bg-tertiary"
@@ -64,8 +77,8 @@ async function submit() {
                         item.is_archived ? 'Archived' : 'Order ' + item.sort_order
                     }}</span>
                 </button>
-                <p v-if="!categories.length" class="p-4 text-sm text-text-secondary">
-                    No categories yet. Create your first category below.
+                <p v-if="!availableCategories.length" class="p-4 text-sm text-text-secondary">
+                    No categories yet.
                 </p>
             </div>
             <form
@@ -103,14 +116,14 @@ async function submit() {
                             min="0"
                             max="1000000"
                             class="mt-2 block w-24 rounded-lg border border-default-background-separator bg-default-background p-2" /></label
-                    ><label class="pb-2 text-sm"
+                    ><label v-if="!selectOnSave" class="pb-2 text-sm"
                         ><input v-model="archived" type="checkbox" class="mr-2" />Archived</label
                     >
                 </div>
             </form>
         </template>
         <template #footer
-            ><SecondaryButton @click="show = false">Close</SecondaryButton
+            ><SecondaryButton :disabled="busy" @click="show = false">Close</SecondaryButton
             ><PrimaryButton
                 v-if="editing ? canUpdateTags() : canCreateTags()"
                 class="ml-3"

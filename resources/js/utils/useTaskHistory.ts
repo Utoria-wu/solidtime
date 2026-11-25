@@ -84,7 +84,7 @@ export function useTaskCategories() {
             ),
         }));
         void client.invalidateQueries({ queryKey });
-        return true;
+        return result.data;
     }
     return { ...query, categories: computed(() => query.data.value?.data ?? []), save };
 }

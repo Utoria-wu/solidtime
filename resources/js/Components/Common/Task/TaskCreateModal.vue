@@ -10,6 +10,7 @@ import ProjectDropdown from '@/Components/Common/Project/ProjectDropdown.vue';
 import TimeEntryNotesField from '@/packages/ui/src/TimeEntry/TimeEntryNotesField.vue';
 import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import TaskCategoryField from './TaskCategoryField.vue';
+import TaskStageField from './TaskStageField.vue';
 import TaskDatesField from './TaskDatesField.vue';
 import EstimatedTimeSection from '@/packages/ui/src/EstimatedTimeSection.vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
@@ -133,17 +134,8 @@ useFocus(taskNameInput, { initialValue: true });
                         @submit="submit()"></EstimatedTimeSection>
                 </div>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <TaskCategoryField v-model="categoryId" /><Field
-                        ><FieldLabel for="task-stage"
-                            >Stage <span class="text-text-secondary">(optional)</span></FieldLabel
-                        ><TextInput
-                            id="task-stage"
-                            v-model="stage"
-                            class="w-full"
-                            placeholder="e.g. Research, Implementation"
-                            maxlength="100"
-                            autocomplete="off"
-                    /></Field>
+                    <TaskCategoryField v-model="categoryId" />
+                    <TaskStageField v-model="stage" :project-id="taskProjectId" />
                 </div>
                 <TimeEntryNotesField v-model="taskNotes" label="Task notes" />
             </FieldGroup>
