@@ -24,7 +24,6 @@ import ProjectMemberTable from '@/Components/Common/ProjectMember/ProjectMemberT
 import ProjectMemberCreateModal from '@/Components/Common/ProjectMember/ProjectMemberCreateModal.vue';
 import { useProjectMembersQuery } from '@/utils/useProjectMembersQuery';
 import { canCreateProjects, canCreateTasks, canViewProjectMembers } from '@/utils/permissions';
-import { TabBar, TabBarItem } from '@/packages/ui/src';
 import { useTasksQuery } from '@/utils/useTasksQuery';
 import ProjectEditModal from '@/Components/Common/Project/ProjectEditModal.vue';
 import { Badge } from '@/packages/ui/src';
@@ -33,7 +32,6 @@ import { getOrganizationCurrencyString } from '../utils/money';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
 import { getCurrentOrganizationId } from '@/utils/useUser';
 import { useTableSortState } from '@/utils/useTableSortState';
-import { useTaskTimers } from '@/utils/useTaskTimers';
 
 const { projects } = useProjectsQuery();
 
@@ -74,15 +72,6 @@ const initialView =
 const taskView = ref(initialView);
 
 const { tasks } = useTasksQuery();
-const { timers } = useTaskTimers();
-const runningCount = computed(() => {
-    const taskIds = new Set(
-        tasks.value.filter((task) => task.project_id === projectId).map((task) => task.id)
-    );
-    return timers.value.filter((timer) => timer.started_at !== null && taskIds.has(timer.task_id))
-        .length;
-});
-
 const { tableState, handleSort } = useTableSortState<SortColumn>('task-table-state', {
     sortColumn: 'name',
     sortDirection: 'asc',
@@ -101,7 +90,8 @@ const activeTasksCount = computed(
 const shownTasks = computed(() =>
     projectTasks.value.filter(
         (task) =>
-            activeTab.value === (task.is_canceled ? 'canceled' : task.is_done ? 'done' : 'active')
+            (taskView.value === 'schedule' ? 'active' : activeTab.value) ===
+            (task.is_canceled ? 'canceled' : task.is_done ? 'done' : 'active')
     )
 );
 
@@ -187,48 +177,52 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                 <div>
                     <CardTitle title="Tasks" :icon="CheckCircleIcon">
                         <template #actions>
-                            <div class="w-full items-center flex justify-between">
-                                <div v-if="taskView !== 'history'" class="pl-6">
-                                    <TabBar v-model="activeTab">
-                                        <TabBarItem value="active">
-                                            Active ({{ activeTasksCount }})
-                                        </TabBarItem>
-                                        <TabBarItem value="done">
-                                            Done ({{ completedTasksCount }})
-                                        </TabBarItem>
-                                        <TabBarItem value="canceled">
-                                            Canceled ({{ canceledTasksCount }})
-                                        </TabBarItem>
-                                    </TabBar>
-                                </div>
-                                <span v-if="runningCount" class="text-xs text-text-secondary">
-                                    {{ runningCount }} running
-                                </span>
-                                <SecondaryButton
-                                    v-if="canCreateTasks()"
-                                    class="ml-auto"
-                                    :icon="PlusIcon"
-                                    @click="createTask = true"
-                                    >Create Task
-                                </SecondaryButton>
-                                <TaskCreateModal
-                                    v-model:show="createTask"
-                                    :project-id="projectId"></TaskCreateModal>
-                            </div>
+                            <SecondaryButton
+                                v-if="canCreateTasks()"
+                                :icon="PlusIcon"
+                                @click="createTask = true">
+                                Create Task
+                            </SecondaryButton>
+                            <TaskCreateModal v-model:show="createTask" :project-id="projectId" />
                         </template>
                     </CardTitle>
                     <div class="[&_[role=row]>*]:bg-transparent">
                         <TaskTable
                             :tasks="shownTasks"
                             :project-id="projectId"
-                            :allow-schedule="activeTab === 'active'"
+                            allow-schedule
                             :initial-view="initialView"
                             allow-history
                             :history-tasks="projectTasks"
                             :sort-column="tableState.sortColumn"
                             :sort-direction="tableState.sortDirection"
                             @view-change="taskView = $event"
-                            @sort="handleSort"></TaskTable>
+                            @sort="handleSort">
+                            <template #toolbar>
+                                <div
+                                    v-if="taskView === 'list'"
+                                    role="group"
+                                    aria-label="Task status"
+                                    class="ml-auto flex flex-wrap gap-1">
+                                    <button
+                                        v-for="[status, label, count] in [
+                                            ['active', 'Active', activeTasksCount],
+                                            ['done', 'Done', completedTasksCount],
+                                            ['canceled', 'Canceled', canceledTasksCount],
+                                        ] as const"
+                                        :key="status"
+                                        type="button"
+                                        :aria-pressed="activeTab === status"
+                                        class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-text-secondary hover:bg-tertiary aria-pressed:bg-tertiary aria-pressed:font-medium aria-pressed:text-text-primary"
+                                        @click="activeTab = status">
+                                        {{ label }}
+                                        <span class="text-xs tabular-nums text-text-secondary">{{
+                                            count
+                                        }}</span>
+                                    </button>
+                                </div>
+                            </template>
+                        </TaskTable>
                     </div>
                 </div>
                 <div v-if="canViewProjectMembers() && showMembers">

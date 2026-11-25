@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TaskCategory } from '@/utils/useTaskHistory';
 import type { Task } from '@/packages/api/src';
-import { CheckIcon, PauseIcon, PlayIcon, StopIcon } from '@heroicons/vue/20/solid';
+import { PlayIcon, StopIcon } from '@heroicons/vue/20/solid';
 import { useTasksStore } from '@/utils/useTasks';
 import TaskMoreOptionsDropdown from '@/Components/Common/Task/TaskMoreOptionsDropdown.vue';
 import TableRow from '@/Components/TableRow.vue';
@@ -55,6 +55,19 @@ const dialogAction = ref<'pause' | 'complete'>('complete');
 const pauseVersion = ref<number | null>(null);
 const eventName = ref('');
 const notes = ref<string | null>(null);
+const canPauseTimer = computed(
+    () =>
+        !props.task.is_canceled &&
+        props.timerReady &&
+        !!props.timer &&
+        (props.timer.started_at !== null || props.timer.elapsed_seconds > 0)
+);
+const showTimerButton = computed(
+    () =>
+        !props.task.is_canceled &&
+        props.timerReady &&
+        (!!props.timer?.started_at || (!props.task.is_done && canUpdateTasks()))
+);
 const eventNameId = computed(() => `calendar-event-name-${props.task.id}`);
 const timerAvailable = computed(
     () =>
@@ -278,15 +291,13 @@ const showTaskEditModal = ref(false);
             </template>
             <span v-else>--</span>
         </div>
-        <div class="relative whitespace-nowrap flex items-center gap-1 px-2 text-text-secondary">
+        <div
+            class="grid grid-cols-[2rem_2rem] items-center gap-1 whitespace-nowrap px-2 text-text-secondary">
             <button
-                v-if="
-                    !task.is_canceled &&
-                    timerReady &&
-                    (timer?.started_at || (!task.is_done && canUpdateTasks()))
-                "
+                v-if="showTimerButton"
                 type="button"
-                class="inline-flex size-8 items-center justify-center rounded hover:text-text-primary disabled:opacity-50"
+                class="inline-flex size-8 items-center justify-center rounded-md text-text-primary hover:bg-tertiary disabled:opacity-50"
+                :class="{ 'bg-teal-500/10': timer?.started_at != null }"
                 :disabled="saving"
                 :title="
                     timer
@@ -306,38 +317,17 @@ const showTaskEditModal = ref(false);
                 <StopIcon v-if="timer?.started_at" class="size-4" />
                 <PlayIcon v-else class="size-4" />
             </button>
-            <button
-                v-if="
-                    !task.is_canceled &&
-                    timerReady &&
-                    timer &&
-                    (timer.started_at !== null || timer.elapsed_seconds > 0)
-                "
-                type="button"
-                class="inline-flex size-8 shrink-0 items-center justify-center rounded hover:text-text-primary disabled:opacity-50"
-                :disabled="saving"
-                title="Pause and save to Calendar"
-                aria-label="Pause and save to Calendar"
-                @click="openPause">
-                <PauseIcon class="size-4" />
-            </button>
-            <button
-                v-if="timer && canUpdateTasks()"
-                type="button"
-                class="inline-flex size-8 items-center justify-center rounded hover:text-text-primary disabled:opacity-50"
-                :disabled="saving"
-                title="Complete task and save to Calendar"
-                aria-label="Complete task and save to Calendar"
-                @click="openCompletion">
-                <CheckIcon class="size-4" />
-            </button>
-            <TaskMoreOptionsDropdown
-                v-if="canDeleteTasks() || canUpdateTasks()"
-                :task="task"
-                @done="markTaskAsDone"
-                @cancel="toggleCanceled"
-                @edit="showTaskEditModal = true"
-                @delete="deleteTask"></TaskMoreOptionsDropdown>
+            <div v-if="canDeleteTasks() || canUpdateTasks() || canPauseTimer" class="col-start-2">
+                <TaskMoreOptionsDropdown
+                    :task="task"
+                    :can-pause-timer="canPauseTimer"
+                    :busy="saving"
+                    @pause="openPause"
+                    @done="markTaskAsDone"
+                    @cancel="toggleCanceled"
+                    @edit="showTaskEditModal = true"
+                    @delete="deleteTask"></TaskMoreOptionsDropdown>
+            </div>
         </div>
         <slot name="timeline" />
         <TaskEditModal v-model:show="showTaskEditModal" :task="task"></TaskEditModal>

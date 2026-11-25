@@ -4,6 +4,7 @@ import { Head, router, usePage } from '@inertiajs/vue3';
 import InterfaceLanguageMenu from '@/Components/InterfaceLanguageMenu.vue';
 import Banner from '@/Components/Banner.vue';
 import OrganizationSwitcher from '@/Components/OrganizationSwitcher.vue';
+import RunningSidebarTasks from '@/Components/RunningSidebarTasks.vue';
 import CurrentSidebarTimer from '@/Components/CurrentSidebarTimer.vue';
 import {
     CalendarIcon,
@@ -327,6 +328,7 @@ const { t } = useInterfaceLanguage();
                     </nav>
                 </div>
                 <div class="justify-self-end">
+                    <RunningSidebarTasks />
                     <UpdateSidebarNotification></UpdateSidebarNotification>
                     <SidebarPlanStatus v-if="isBillingActivated() && canManageBilling()" />
                     <InterfaceLanguageMenu />

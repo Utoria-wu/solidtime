@@ -206,6 +206,7 @@ const { t } = useInterfaceLanguage();
                 {{ option === 'history' ? 'History' : t(option === 'list' ? 'List' : 'Schedule') }}
             </button>
         </div>
+        <slot name="toolbar" />
         <div v-if="showSchedule" class="ml-auto flex items-center gap-2 text-sm">
             <SecondaryButton @click="weekOffset = 0">{{ t('Today') }}</SecondaryButton>
             <SecondaryButton aria-label="Previous week" @click="weekOffset--">‹</SecondaryButton>
@@ -226,8 +227,8 @@ const { t } = useInterfaceLanguage();
                 :class="{ 'schedule-table': showSchedule }"
                 :style="{
                     gridTemplateColumns: showSchedule
-                        ? 'minmax(13rem, 1fr) 5rem 9.5rem minmax(34rem, 2.5fr)'
-                        : 'minmax(10rem, 1fr) repeat(2, minmax(7.5rem, max-content)) 11rem minmax(80px, auto) minmax(95px, auto) 8rem 9.5rem',
+                        ? 'minmax(13rem, 1fr) 5rem 5.75rem minmax(34rem, 2.5fr)'
+                        : 'minmax(10rem, 1fr) repeat(2, minmax(7.5rem, max-content)) 11rem minmax(80px, auto) minmax(95px, auto) 8rem 5.75rem',
                     '--schedule-days': scheduleDays,
                 }">
                 <TaskTableHeading
