@@ -2,8 +2,7 @@
 import { computed, inject, type ComputedRef } from 'vue';
 import { useQuery } from '@tanstack/vue-query';
 import { XMarkIcon, ArrowTopRightOnSquareIcon } from '@heroicons/vue/20/solid';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
+import { renderNotes } from '@/packages/ui/src/utils/notes';
 import { api, type Organization, type Task, type TimeEntry } from '@/packages/api/src';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/packages/ui/src/dialog';
 import { Button } from '@/packages/ui/src/Buttons';
@@ -68,16 +67,7 @@ function duration(seconds: number) {
         organization?.value.number_format
     );
 }
-function renderNotes(notes: string | null | undefined) {
-    return DOMPurify.sanitize(
-        marked.parse(notes ?? '', { async: false, gfm: true, breaks: true }),
-        {
-            USE_PROFILES: { html: true },
-            FORBID_TAGS: ['img', 'style', 'form', 'textarea', 'button', 'select'],
-            FORBID_ATTR: ['style'],
-        }
-    );
-}
+
 const taskNotes = computed(() =>
     typeof props.task?.markdown_notes === 'string' && props.task.markdown_notes.trim()
         ? renderNotes(props.task.markdown_notes)
