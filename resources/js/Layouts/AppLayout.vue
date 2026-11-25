@@ -58,7 +58,7 @@ import { getCurrentOrganizationId } from '@/utils/useUser';
 import LoadingSpinner from '@/packages/ui/src/LoadingSpinner.vue';
 import { twMerge } from 'tailwind-merge';
 import { Button } from '@/packages/ui/src/Buttons';
-import { openFeedback } from '@/utils/feedback';
+
 import { CommandPaletteProvider } from '@/Components/CommandPalette';
 import { useCommandPalette } from '@/utils/useCommandPalette';
 
@@ -328,29 +328,21 @@ const { t } = useInterfaceLanguage();
                     </nav>
                 </div>
                 <div class="justify-self-end">
-                    <RunningSidebarTasks />
                     <UpdateSidebarNotification></UpdateSidebarNotification>
                     <SidebarPlanStatus v-if="isBillingActivated() && canManageBilling()" />
-                    <InterfaceLanguageMenu />
-                    <ul
-                        class="border-t border-default-background-separator pt-3 gap-1 flex justify-between items-center">
-                        <UserSettingsIcon></UserSettingsIcon>
-
-                        <NavigationSidebarItem
-                            class="flex-1"
-                            :title="t('Profile Settings')"
-                            :icon="Cog6ToothIcon"
-                            :href="route('profile.show')"></NavigationSidebarItem>
-
-                        <Button
-                            v-if="page.props.has_services_extension"
-                            variant="outline"
-                            size="xs"
-                            class="rounded-full ml-2 flex h-6 w-6 items-center text-xs text-icon-default justify-center"
-                            @click="openFeedback">
-                            ?
-                        </Button>
-                    </ul>
+                    <RunningSidebarTasks />
+                    <div class="space-y-0.5 border-t border-default-background-separator pt-2">
+                        <InterfaceLanguageMenu />
+                        <div class="flex items-center gap-1">
+                            <ul class="min-w-0 flex-1">
+                                <NavigationSidebarItem
+                                    :title="t('Profile Settings')"
+                                    :icon="Cog6ToothIcon"
+                                    :href="route('profile.show')" />
+                            </ul>
+                            <UserSettingsIcon />
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

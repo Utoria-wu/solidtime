@@ -2,7 +2,7 @@
 import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import { PlusCircleIcon } from '@heroicons/vue/24/solid';
-import { PlusIcon } from '@heroicons/vue/16/solid';
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@heroicons/vue/16/solid';
 import { computed, ref, watch } from 'vue';
 import { TooltipProvider } from '@/packages/ui/src';
 import { getDayJsInstance, getLocalizedDayJs } from '@/packages/ui/src/utils/time';
@@ -139,7 +139,7 @@ const weekLabel = computed(() => {
 });
 const groups = [
     { id: 'overdue', label: 'Overdue' },
-    { id: 'ready', label: 'Ready to work' },
+    { id: 'ready', label: 'Scheduled' },
     { id: 'upcoming', label: 'Upcoming' },
     { id: 'unscheduled', label: 'Unscheduled' },
 ] as const;
@@ -184,6 +184,21 @@ const rowGroups = computed(() => {
         .filter((group) => group.tasks.length);
 });
 const { t } = useInterfaceLanguage();
+function plannedDates(task: Task) {
+    const { start_date: start, due_date: due } = task;
+    const format = (date: string) => {
+        const value = getDayJsInstance()(date);
+        return value.format(value.year() === days.value[0]!.year() ? 'MMM D' : 'MMM D, YYYY');
+    };
+    if (start && due) return start === due ? format(start) : format(start) + ' – ' + format(due);
+    if (due) return t('Due date') + ' · ' + format(due);
+    if (start) {
+        return task.is_done || task.is_canceled
+            ? format(start)
+            : format(start) + ' · ' + t('Ongoing');
+    }
+    return t('No dates set');
+}
 </script>
 
 <template>
@@ -207,12 +222,40 @@ const { t } = useInterfaceLanguage();
                 {{ option === 'history' ? 'History' : t(option === 'list' ? 'List' : 'Schedule') }}
             </button>
         </div>
-        <slot name="toolbar" />
-        <div v-if="showSchedule" class="ml-auto flex items-center gap-2 text-sm">
-            <SecondaryButton @click="weekOffset = 0">{{ t('Today') }}</SecondaryButton>
-            <SecondaryButton aria-label="Previous week" @click="weekOffset--">‹</SecondaryButton>
-            <span class="min-w-40 text-center font-medium" aria-live="polite">{{ weekLabel }}</span>
-            <SecondaryButton aria-label="Next week" @click="weekOffset++">›</SecondaryButton>
+        <div class="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+            <slot name="toolbar" />
+            <div v-if="showSchedule" class="flex flex-wrap items-center gap-2 text-sm">
+                <button
+                    :aria-disabled="weekOffset === 0"
+                    type="button"
+                    class="rounded-md px-2.5 py-1.5 text-text-secondary hover:bg-tertiary hover:text-text-primary aria-disabled:opacity-50"
+                    @click="weekOffset = 0">
+                    {{ t('Today') }}
+                </button>
+                <div
+                    class="inline-flex items-center gap-1 rounded-lg border border-default-background-separator p-0.5"
+                    role="group"
+                    aria-label="Schedule date range">
+                    <button
+                        type="button"
+                        class="schedule-nav"
+                        aria-label="Previous week"
+                        @click="weekOffset--">
+                        <ChevronLeftIcon class="size-4" />
+                    </button>
+                    <span class="px-1.5 text-center font-medium tabular-nums" aria-live="polite">{{
+                        weekLabel
+                    }}</span>
+                    <button
+                        type="button"
+                        class="schedule-nav"
+                        aria-label="Next week"
+                        @click="weekOffset++">
+                        <ChevronRightIcon class="size-4" />
+                    </button>
+                </div>
+            </div>
+            <slot name="actions" />
         </div>
     </div>
     <ProjectTaskHistory
@@ -229,7 +272,7 @@ const { t } = useInterfaceLanguage();
                     :class="{ 'schedule-table': showSchedule }"
                     :style="{
                         gridTemplateColumns: showSchedule
-                            ? 'minmax(13rem, 1fr) 5rem 5.75rem minmax(34rem, 2.5fr)'
+                            ? 'minmax(16rem, 22rem) 5.5rem 5.25rem minmax(34rem, 1fr)'
                             : 'minmax(10rem, 1fr) repeat(2, minmax(7.5rem, max-content)) 11rem minmax(80px, auto) minmax(95px, auto) 8rem 5.75rem',
                         '--schedule-days': scheduleDays,
                     }">
@@ -240,11 +283,12 @@ const { t } = useInterfaceLanguage();
                         :desc-first-columns="descFirstColumns"
                         @sort="handleSort"></TaskTableHeading>
                     <div v-else role="row" class="contents text-xs text-text-secondary">
-                        <div role="columnheader" class="px-4 py-3">
-                            {{ t('Task / Planned dates') }}
+                        <div role="columnheader" class="flex items-center px-4 font-medium">
+                            {{ t('Tasks') }}
                         </div>
-                        <div role="columnheader" class="px-3 py-3">{{ t('Timer') }}</div>
-                        <div role="columnheader"><span class="sr-only">Actions</span></div>
+                        <div role="columnheader" class="col-span-2">
+                            <span class="sr-only">Timer and actions</span>
+                        </div>
                         <div
                             role="columnheader"
                             aria-label="Two-week timeline"
@@ -256,7 +300,7 @@ const { t } = useInterfaceLanguage();
                                 :class="{ 'schedule-today': weekDates[index] === today }"
                                 :aria-current="weekDates[index] === today ? 'date' : undefined"
                                 :title="day.format('dddd, MMM D, YYYY')">
-                                {{ day.format('dd') }}
+                                {{ day.format('ddd') }}
                                 <strong
                                     class="schedule-date flex size-6 items-center justify-center rounded-md text-sm text-text-primary"
                                     >{{ day.format('D') }}</strong
@@ -264,14 +308,18 @@ const { t } = useInterfaceLanguage();
                             </div>
                         </div>
                     </div>
-                    <div v-if="sortedTasks.length === 0" class="col-span-full py-24 text-center">
+                    <div v-if="sortedTasks.length === 0" class="col-span-full py-16 text-center">
                         <PlusCircleIcon class="w-8 text-icon-default inline pb-2"></PlusCircleIcon>
-                        <h3 class="text-text-primary font-semibold">{{ t('No tasks found') }}</h3>
-                        <p v-if="projectId && canCreateTasks()" class="pb-5">
+                        <h3 class="text-text-primary font-semibold">
+                            {{
+                                t(showSchedule && projectId ? 'No active tasks' : 'No tasks found')
+                            }}
+                        </h3>
+                        <p v-if="projectId && canCreateTasks() && !$slots.actions" class="pb-5">
                             Create your first task now!
                         </p>
                         <SecondaryButton
-                            v-if="projectId && canCreateTasks()"
+                            v-if="projectId && canCreateTasks() && !$slots.actions"
                             :icon="PlusIcon"
                             @click="createTask = true"
                             >Create your First Task
@@ -281,9 +329,9 @@ const { t } = useInterfaceLanguage();
                         <div v-if="showSchedule" role="row" class="contents">
                             <div
                                 role="cell"
-                                class="schedule-group-label col-span-3 px-4 py-2.5 text-xs font-medium text-text-secondary">
+                                class="schedule-group-label col-span-3 flex items-center gap-2 px-4 py-2 text-xs font-medium text-text-secondary">
                                 {{ scheduleProjects ? group.label : t(group.label) }}
-                                <span class="ml-1 text-text-secondary">{{
+                                <span class="tabular-nums text-text-tertiary">{{
                                     group.tasks.length
                                 }}</span>
                             </div>
@@ -297,6 +345,10 @@ const { t } = useInterfaceLanguage();
                             v-for="task in group.tasks"
                             :key="task.id"
                             :task="task"
+                            :class="{
+                                'schedule-row': showSchedule,
+                                'project-list-row': projectId && !showSchedule,
+                            }"
                             :task-category="categoryMap.get(task.category_id ?? '')"
                             :timer="timersByTask.get(task.id)"
                             :timer-ready="ready"
@@ -304,30 +356,13 @@ const { t } = useInterfaceLanguage();
                             :change="change"
                             @open-activity="openActivity(task)">
                             <template v-if="showSchedule" #planned-dates>
-                                <span class="text-xs font-normal text-text-secondary">
-                                    <template v-if="task.start_date">{{
-                                        getDayJsInstance()(task.start_date).format('MMM D, YYYY')
-                                    }}</template>
-                                    <template v-if="task.due_date">
-                                        {{ task.start_date ? ' → ' : 'Due '
-                                        }}{{
-                                            getDayJsInstance()(task.due_date).format('MMM D, YYYY')
-                                        }}
-                                    </template>
-                                    <template
-                                        v-else-if="
-                                            task.start_date && !task.is_done && !task.is_canceled
-                                        ">
-                                        {{ ' → ' + t('Ongoing') }}
-                                    </template>
-                                    <template v-else-if="!task.start_date">{{
-                                        t('No dates set')
-                                    }}</template>
+                                <span class="truncate text-xs font-normal text-text-secondary">
+                                    {{ plannedDates(task) }}
                                     <span v-if="scheduleProjects && task.is_done">
                                         · {{ t('Done') }}</span
                                     >
                                     <span
-                                        v-else-if="taskGroup(task) === 'overdue'"
+                                        v-else-if="scheduleProjects && taskGroup(task) === 'overdue'"
                                         class="text-red-500">
                                         · Overdue</span
                                     >
@@ -350,6 +385,17 @@ const { t } = useInterfaceLanguage();
 </template>
 
 <style scoped>
+.schedule-nav {
+    display: grid;
+    place-items: center;
+    width: 1.875rem;
+    height: 1.875rem;
+    border-radius: 0.375rem;
+    color: var(--theme-color-text-secondary);
+}
+.schedule-nav:hover {
+    background: color-mix(in oklch, currentColor 9%, transparent);
+}
 .schedule-table {
     --schedule-line: color-mix(
         in oklch,
@@ -363,6 +409,14 @@ const { t } = useInterfaceLanguage();
     );
     --schedule-today: color-mix(in oklch, #70b3cf 38%, transparent);
     border-top: 1px solid var(--theme-color-default-background-separator);
+}
+.schedule-table :deep(.schedule-row > *),
+:deep(.project-list-row > *) {
+    background-color: transparent;
+}
+.schedule-table :deep(.schedule-row:hover > *),
+.schedule-table :deep(.schedule-row:focus-within > *) {
+    background-color: color-mix(in oklch, var(--theme-color-text-secondary) 4%, transparent);
 }
 .schedule-group-label,
 .schedule-group-track {
@@ -385,6 +439,6 @@ const { t } = useInterfaceLanguage();
 .schedule-today .schedule-date {
     color: var(--theme-color-text-primary);
     border: 1px solid var(--schedule-today);
-    border-radius: 9999px;
+    background: color-mix(in oklch, var(--schedule-today) 24%, transparent);
 }
 </style>

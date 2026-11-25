@@ -209,21 +209,30 @@ const showTaskEditModal = ref(false);
 <template>
     <TableRow>
         <div
-            class="whitespace-nowrap min-w-0 flex py-4 pr-3 text-sm font-medium text-text-primary pl-4 sm:pl-6 lg:pl-8 3xl:pl-12"
-            :class="$slots.timeline ? 'flex-col justify-center gap-1' : 'items-center space-x-5'">
-            <button
-                type="button"
-                class="truncate text-left hover:underline"
-                :title="task.name"
-                @click="emit('openActivity')">
-                {{ task.name }}
-            </button>
-            <span
-                v-if="taskCategory"
-                class="max-w-28 truncate rounded px-1.5 py-0.5 text-[11px] font-normal"
-                :style="{ color: taskCategory.color, backgroundColor: taskCategory.color + '12' }"
-                >{{ taskCategory.name }}</span
-            >
+            class="flex min-w-0 whitespace-nowrap pr-3 text-sm font-medium text-text-primary"
+            :class="
+                $slots.timeline
+                    ? 'flex-col justify-center gap-0.5 py-2.5 pl-4'
+                    : 'items-center py-4 pl-4 sm:pl-6 lg:pl-8 3xl:pl-12'
+            ">
+            <div class="flex min-w-0 items-center gap-2">
+                <button
+                    type="button"
+                    class="truncate text-left hover:underline"
+                    :title="task.name"
+                    @click="emit('openActivity')">
+                    {{ task.name }}
+                </button>
+                <span
+                    v-if="taskCategory"
+                    class="inline-flex min-w-0 shrink-0 items-center gap-1 rounded border border-default-background-separator px-1.5 py-0.5 text-[11px] font-normal text-text-secondary"
+                    :title="taskCategory.name">
+                    <span
+                        class="size-1.5 shrink-0 rounded-full"
+                        :style="{ backgroundColor: taskCategory.color }" />
+                    <span class="max-w-20 truncate">{{ taskCategory.name }}</span>
+                </span>
+            </div>
             <slot name="planned-dates" />
         </div>
         <template v-if="!$slots.timeline">
@@ -288,7 +297,8 @@ const showTaskEditModal = ref(false);
             <span v-else> -- </span>
         </div>
         <div
-            class="whitespace-nowrap px-3 py-4 text-sm text-text-secondary flex space-x-1 items-center font-medium">
+            class="flex items-center gap-1 whitespace-nowrap text-sm font-medium text-text-secondary"
+            :class="$slots.timeline ? 'justify-end px-1 text-xs' : 'px-3 py-4'">
             <template v-if="timer">
                 <span
                     class="size-2 rounded-full"
@@ -298,7 +308,7 @@ const showTaskEditModal = ref(false);
                     formatDuration(elapsedTaskSeconds(timer, now))
                 }}</span>
             </template>
-            <span v-else>--</span>
+            <span v-else-if="!$slots.timeline">--</span>
         </div>
         <div
             class="grid grid-cols-[2rem_2rem] items-center gap-1 whitespace-nowrap px-2 text-text-secondary">

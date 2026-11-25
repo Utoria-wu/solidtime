@@ -7,12 +7,7 @@ import { FolderIcon, PlusIcon } from '@heroicons/vue/20/solid';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import { computed, ref } from 'vue';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
-import {
-    ChevronRightIcon,
-    CheckCircleIcon,
-    UserGroupIcon,
-    PencilSquareIcon,
-} from '@heroicons/vue/20/solid';
+import { ChevronRightIcon, UserGroupIcon, PencilSquareIcon } from '@heroicons/vue/20/solid';
 
 import { Link, usePage } from '@inertiajs/vue3';
 import TaskCreateModal from '@/Components/Common/Task/TaskCreateModal.vue';
@@ -173,9 +168,44 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
             </div>
         </MainContainer>
         <MainContainer>
-            <div class="grid grid-cols-1 gap-6 pt-6">
-                <div>
-                    <CardTitle title="Tasks" :icon="CheckCircleIcon">
+            <div class="grid grid-cols-1 gap-6 pt-2">
+                <section aria-label="Tasks" class="min-w-0">
+                    <TaskCreateModal v-model:show="createTask" :project-id="projectId" />
+                    <TaskTable
+                        :tasks="shownTasks"
+                        :project-id="projectId"
+                        allow-schedule
+                        :initial-view="initialView"
+                        allow-history
+                        :history-tasks="projectTasks"
+                        :sort-column="tableState.sortColumn"
+                        :sort-direction="tableState.sortDirection"
+                        @view-change="taskView = $event"
+                        @sort="handleSort">
+                        <template #toolbar>
+                            <div
+                                v-if="taskView === 'list'"
+                                role="group"
+                                aria-label="Task status"
+                                class="ml-auto flex flex-wrap gap-1">
+                                <button
+                                    v-for="[status, label, count] in [
+                                        ['active', 'Active', activeTasksCount],
+                                        ['done', 'Done', completedTasksCount],
+                                        ['canceled', 'Canceled', canceledTasksCount],
+                                    ] as const"
+                                    :key="status"
+                                    type="button"
+                                    :aria-pressed="activeTab === status"
+                                    class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-text-secondary hover:bg-tertiary aria-pressed:bg-tertiary aria-pressed:font-medium aria-pressed:text-text-primary"
+                                    @click="activeTab = status">
+                                    {{ label }}
+                                    <span class="text-xs tabular-nums text-text-secondary">{{
+                                        count
+                                    }}</span>
+                                </button>
+                            </div>
+                        </template>
                         <template #actions>
                             <SecondaryButton
                                 v-if="canCreateTasks()"
@@ -183,48 +213,9 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                                 @click="createTask = true">
                                 Create Task
                             </SecondaryButton>
-                            <TaskCreateModal v-model:show="createTask" :project-id="projectId" />
                         </template>
-                    </CardTitle>
-                    <div class="[&_[role=row]>*]:bg-transparent">
-                        <TaskTable
-                            :tasks="shownTasks"
-                            :project-id="projectId"
-                            allow-schedule
-                            :initial-view="initialView"
-                            allow-history
-                            :history-tasks="projectTasks"
-                            :sort-column="tableState.sortColumn"
-                            :sort-direction="tableState.sortDirection"
-                            @view-change="taskView = $event"
-                            @sort="handleSort">
-                            <template #toolbar>
-                                <div
-                                    v-if="taskView === 'list'"
-                                    role="group"
-                                    aria-label="Task status"
-                                    class="ml-auto flex flex-wrap gap-1">
-                                    <button
-                                        v-for="[status, label, count] in [
-                                            ['active', 'Active', activeTasksCount],
-                                            ['done', 'Done', completedTasksCount],
-                                            ['canceled', 'Canceled', canceledTasksCount],
-                                        ] as const"
-                                        :key="status"
-                                        type="button"
-                                        :aria-pressed="activeTab === status"
-                                        class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-text-secondary hover:bg-tertiary aria-pressed:bg-tertiary aria-pressed:font-medium aria-pressed:text-text-primary"
-                                        @click="activeTab = status">
-                                        {{ label }}
-                                        <span class="text-xs tabular-nums text-text-secondary">{{
-                                            count
-                                        }}</span>
-                                    </button>
-                                </div>
-                            </template>
-                        </TaskTable>
-                    </div>
-                </div>
+                    </TaskTable>
+                </section>
                 <div v-if="canViewProjectMembers() && showMembers">
                     <CardTitle title="Project Members" :icon="UserGroupIcon">
                         <template #actions>
