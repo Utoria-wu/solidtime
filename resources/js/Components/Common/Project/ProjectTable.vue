@@ -173,7 +173,7 @@ async function createClient(client: CreateClientBody): Promise<Client | undefine
 }
 
 const gridTemplate = computed(() => {
-    return `grid-template-columns: minmax(12rem, 1fr) minmax(7.5rem, max-content) var(--progress-column) repeat(2, max-content) var(--progress-column) ${props.showBillableRate ? 'max-content' : ''} max-content max-content max-content;`;
+    return `grid-template-columns: minmax(12rem, 1fr) var(--tags-column) minmax(7.5rem, max-content) var(--progress-column) repeat(2, max-content) var(--progress-column) ${props.showBillableRate ? 'max-content' : ''} max-content max-content max-content;`;
 });
 </script>
 
@@ -234,7 +234,8 @@ const gridTemplate = computed(() => {
 
 <style scoped>
 .project-grid {
-    --cell-inset: clamp(0.75rem, calc(3vw - 2rem), 2rem);
+    --cell-inset: clamp(0.5rem, calc(3vw - 2.5rem), 2rem);
+    --tags-column: calc(10.5rem + 2 * var(--cell-inset));
     --progress-column: calc(8.5rem + 2 * var(--cell-inset));
 }
 
