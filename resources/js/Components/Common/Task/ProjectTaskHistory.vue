@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useQuery } from '@tanstack/vue-query';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
+import { renderNotes } from '@/packages/ui/src/utils/notes';
 import {
     AdjustmentsHorizontalIcon,
     ArrowPathIcon,
@@ -192,16 +191,6 @@ function toggle(id: string) {
     else next.add(id);
     collapsed.value = next;
 }
-function notesHtml(notes: string | null) {
-    return DOMPurify.sanitize(
-        marked.parse(notes ?? '', { async: false, gfm: true, breaks: true }),
-        {
-            USE_PROFILES: { html: true },
-            FORBID_TAGS: ['img', 'style', 'form', 'textarea', 'button', 'select'],
-            FORBID_ATTR: ['style'],
-        }
-    );
-}
 </script>
 
 <template>
@@ -356,7 +345,7 @@ function notesHtml(notes: string | null) {
                                     <div
                                         v-if="record.note"
                                         class="history-markdown mt-2 text-sm"
-                                        v-html="notesHtml(record.note)" />
+                                        v-html="renderNotes(record.note)" />
                                     <a
                                         v-if="record.legacy?.parent_id"
                                         :href="'#history-' + record.legacy.parent_id"

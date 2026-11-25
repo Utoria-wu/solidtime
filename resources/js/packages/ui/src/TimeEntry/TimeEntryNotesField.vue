@@ -1,107 +1,213 @@
 <script setup lang="ts">
-import { computed, ref, useId } from 'vue';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
-import TextareaInput from '../Input/TextareaInput.vue';
-import TabBar from '../TabBar/TabBar.vue';
-import TabBarItem from '../TabBar/TabBarItem.vue';
+import { ref, useId, watchPostEffect } from 'vue';
 import { Field, FieldLabel } from '../field';
+import { noteColors, renderNotes, serializeNotes } from '../utils/notes';
 
 withDefaults(defineProps<{ label?: string }>(), { label: 'Notes' });
-
 const notes = defineModel<string | null>();
+const editor = ref<HTMLDivElement | null>(null);
 const inputId = useId();
-const draft = computed({
-    get: () => notes.value ?? '',
-    set: (value: string | number) => {
-        notes.value = String(value);
-    },
+const tooLong = ref(false);
+let previousValue: string | null | undefined;
+let selection: Range | undefined;
+
+watchPostEffect(() => {
+    const value = notes.value;
+    if (editor.value && (previousValue !== value || editor.value.dataset.ready !== 'true')) {
+        previousValue = value;
+        editor.value.innerHTML = renderNotes(value);
+        editor.value.dataset.ready = 'true';
+        selection = undefined;
+        tooLong.value = false;
+    }
 });
-const mode = ref('write');
-const renderedNotes = computed(() =>
-    DOMPurify.sanitize(marked.parse(notes.value ?? '', { async: false, gfm: true, breaks: true }), {
-        USE_PROFILES: { html: true },
-        FORBID_TAGS: ['img', 'style', 'form', 'textarea', 'button', 'select'],
-        FORBID_ATTR: ['style'],
-    })
-);
+
+function rememberSelection() {
+    const current = window.getSelection();
+    if (
+        current?.rangeCount &&
+        editor.value?.contains(current.getRangeAt(0).commonAncestorContainer)
+    )
+        selection = current.getRangeAt(0).cloneRange();
+}
+
+function syncNotes() {
+    if (!editor.value) return;
+    const value = serializeNotes(editor.value);
+    tooLong.value = value.length > 10000;
+    if (tooLong.value) {
+        editor.value.innerHTML = renderNotes(previousValue);
+        selection = undefined;
+        return;
+    }
+    previousValue = value || null;
+    notes.value = previousValue;
+    rememberSelection();
+}
+
+function format(command: string, value?: string) {
+    const target = editor.value;
+    if (!target) return;
+    target.focus();
+    const current = window.getSelection();
+    if (selection && target.contains(selection.commonAncestorContainer)) {
+        current?.removeAllRanges();
+        current?.addRange(selection);
+    }
+    document.execCommand('styleWithCSS', false, 'false');
+    document.execCommand(command, false, value);
+    syncNotes();
+}
+
+function resetColor() {
+    if (editor.value) format('foreColor', getComputedStyle(editor.value).color);
+}
+
+function paste(event: ClipboardEvent) {
+    const text = event.clipboardData?.getData('text/plain');
+    if (!text) return;
+    const escaped = document.createElement('div');
+    escaped.textContent = text;
+    format('insertHTML', renderNotes(escaped.innerHTML));
+}
 </script>
 
 <template>
     <Field>
-        <div class="flex items-center justify-between gap-4">
-            <FieldLabel :for="inputId">{{ label }}</FieldLabel>
-            <div class="shrink-0">
-                <TabBar v-model="mode" default-value="write">
-                    <TabBarItem value="write">Write</TabBarItem>
-                    <TabBarItem value="preview">Preview</TabBarItem>
-                </TabBar>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+            <FieldLabel :id="inputId + '-label'">{{ label }}</FieldLabel>
+            <div role="group" aria-label="Note formatting" class="flex items-center gap-1">
+                <button
+                    type="button"
+                    aria-label="Bold"
+                    title="Bold"
+                    class="format-button font-bold"
+                    @mousedown.prevent
+                    @click="format('bold')">
+                    B
+                </button>
+                <button
+                    type="button"
+                    aria-label="Italic"
+                    title="Italic"
+                    class="format-button italic"
+                    @mousedown.prevent
+                    @click="format('italic')">
+                    I
+                </button>
+                <button
+                    type="button"
+                    aria-label="Bulleted list"
+                    title="Bulleted list"
+                    class="format-button"
+                    @mousedown.prevent
+                    @click="format('insertUnorderedList')">
+                    ≡
+                </button>
+                <span
+                    class="mx-1 h-4 border-l border-default-background-separator"
+                    aria-hidden="true" />
+                <button
+                    type="button"
+                    aria-label="Default text color"
+                    title="Default text color"
+                    class="format-button"
+                    @mousedown.prevent
+                    @click="resetColor">
+                    A
+                </button>
+                <button
+                    v-for="color in noteColors"
+                    :key="color.hex"
+                    type="button"
+                    :aria-label="color.label + ' text'"
+                    :title="color.label + ' text'"
+                    class="format-button"
+                    @mousedown.prevent
+                    @click="format('foreColor', color.hex)">
+                    <span
+                        class="size-3 rounded-full"
+                        :style="{ backgroundColor: color.hex }"
+                        aria-hidden="true" />
+                </button>
             </div>
         </div>
-        <TextareaInput
-            v-if="mode === 'write'"
-            :id="inputId"
-            v-model="draft"
-            :rows="7"
-            maxlength="10000"
-            class="w-full font-mono text-sm leading-6"
-            autocomplete="off"
-            placeholder="Add details, a checklist, or links…" />
         <div
-            v-else
-            role="region"
-            aria-label="Notes preview"
-            class="notes-preview min-h-48 rounded-md border border-input-border bg-input-background p-3 text-sm text-text-primary">
-            <div v-if="notes?.trim()" v-html="renderedNotes"></div>
-            <p v-else class="text-text-tertiary">Nothing to preview yet.</p>
-        </div>
+            ref="editor"
+            role="textbox"
+            aria-multiline="true"
+            :aria-labelledby="inputId + '-label'"
+            contenteditable="true"
+            class="notes-editor min-h-36 max-h-80 overflow-y-auto rounded-md border border-input-border bg-input-background p-3 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            @input="syncNotes"
+            @mouseup="rememberSelection"
+            @keyup="rememberSelection"
+            @paste.prevent="paste"
+            @drop.prevent />
+        <p v-if="tooLong" role="alert" class="text-xs text-destructive">The note is too long.</p>
     </Field>
 </template>
 
 <style scoped>
-.notes-preview :deep(h1),
-.notes-preview :deep(h2),
-.notes-preview :deep(h3) {
+.format-button {
+    display: inline-flex;
+    width: 1.5rem;
+    height: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.25rem;
+}
+.format-button:hover,
+.format-button:focus-visible {
+    background: var(--theme-color-tertiary);
+}
+.notes-editor {
+    overflow-wrap: anywhere;
+}
+
+.notes-editor :deep(h1),
+.notes-editor :deep(h2),
+.notes-editor :deep(h3) {
     margin-bottom: 0.75rem;
     font-size: 1rem;
     font-weight: 600;
 }
-.notes-preview :deep(p),
-.notes-preview :deep(ul),
-.notes-preview :deep(ol) {
+.notes-editor :deep(p),
+.notes-editor :deep(ul),
+.notes-editor :deep(ol) {
     margin-bottom: 0.75rem;
     line-height: 1.75;
 }
-.notes-preview :deep(ul) {
+.notes-editor :deep(ul) {
     padding-left: 1.25rem;
     list-style-type: disc;
 }
-.notes-preview :deep(ol) {
+.notes-editor :deep(ol) {
     padding-left: 1.25rem;
     list-style-type: decimal;
 }
-.notes-preview :deep(ul:has(> li > input[type='checkbox'])) {
+.notes-editor :deep(ul:has(> li > input[type='checkbox'])) {
     padding-left: 0;
     list-style: none;
 }
-.notes-preview :deep(input[type='checkbox']) {
+.notes-editor :deep(input[type='checkbox']) {
     margin-right: 0.5rem;
 }
-.notes-preview :deep(a) {
+.notes-editor :deep(a) {
     text-decoration: underline;
 }
-.notes-preview :deep(code) {
+.notes-editor :deep(code) {
     font-family: monospace;
 }
-.notes-preview :deep(pre) {
+.notes-editor :deep(pre) {
     overflow-x: auto;
     padding: 0.75rem;
 }
-.notes-preview :deep(blockquote) {
+.notes-editor :deep(blockquote) {
     border-left: 2px solid currentColor;
     padding-left: 0.75rem;
 }
-.notes-preview :deep(:last-child) {
+.notes-editor :deep(:last-child) {
     margin-bottom: 0;
 }
 </style>
