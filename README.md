@@ -11,6 +11,7 @@ Add a **History** view beside the existing task List and Schedule views on a pro
 - Browse all project tasks, including completed and canceled tasks, grouped by category or optional stage.
 - Create organization-wide categories with editable names, colors, display order, and archive status. Existing tasks stay uncategorized until assigned; archiving retains existing assignments.
 - Capture Progress, Problem, Investigation, Attempt, Finding, Action, and Verification records with Markdown notes and an occurrence date.
+- Follow a borderless timeline with thin connecting lines, indented branches, small circular icons, and subtle hover/selection feedback.
 - Link a record to a problem and a preceding record within the same task. Mark unsuccessful attempts, resolved problems, and verified outcomes without overwriting the investigation.
 - Link an accessible Calendar event, or explicitly copy its title, notes, and date into a new record. Existing Calendar notes are not automatically classified or rewritten.
 - Search the timeline, filter open or resolved problems, and inspect the selected record, its relationships, and Calendar source.
@@ -30,7 +31,7 @@ Screenshots below are captured from the actual local application with sample dat
 
 ## Validation
 
-Verified locally on 2026-11-24 against an isolated PostgreSQL sample database.
+Functional validation was performed locally on 2026-11-24 against an isolated PostgreSQL sample database. The borderless timeline styling was checked in the browser on 2026-11-25, including zero row borders/shadows and responsive screenshots.
 
 - PostgreSQL migration applied successfully to a local preview database.
 - PHP endpoint tests: **6 tests, 107 assertions passed**, covering category organization scoping, archive behavior, task field persistence, private-project and Calendar permissions, record relationships and chronology, version conflicts, dependent-record deletion, and existing Stop/Pause timer behavior.
