@@ -49,6 +49,7 @@ const props = defineProps<{
 }>();
 
 const saving = ref(false);
+const directCompletionOpen = ref(false);
 const completionTimerId = ref<string | null>(null);
 const dialogAction = ref<'pause' | 'complete'>('complete');
 const pauseVersion = ref<number | null>(null);
@@ -63,7 +64,7 @@ const timerAvailable = computed(
             (props.timer.started_at === null && props.timer.version === pauseVersion.value))
 );
 const canSaveCompletion = computed(
-    () => !saving.value && timerAvailable.value && eventName.value.trim().length > 0
+    () => !saving.value && (directCompletionOpen.value || timerAvailable.value)
 );
 
 function openCompletion() {
@@ -96,13 +97,34 @@ async function openPause() {
     completionTimerId.value = timer.id;
 }
 
-function submitCompletion() {
-    if (canSaveCompletion.value) {
-        void changeTimer(dialogAction.value, {
-            description: eventName.value.trim(),
-            markdown_notes: notes.value?.trim() ? notes.value : null,
-        });
+async function submitCompletion() {
+    if (!canSaveCompletion.value) return;
+    const note = notes.value?.trim() ? notes.value : null;
+    if (directCompletionOpen.value) {
+        saving.value = true;
+        try {
+            const result = await useTasksStore().updateTask(props.task.id, {
+                name: props.task.name,
+                is_done: true,
+                completion_notes: note,
+            });
+            if (result) closeCompletion();
+        } finally {
+            saving.value = false;
+        }
+        return;
     }
+
+    await changeTimer(dialogAction.value, {
+        description: eventName.value.trim() || props.task.name,
+        markdown_notes: note,
+        ...(dialogAction.value === 'complete' ? { completion_notes: note } : {}),
+    });
+}
+
+function closeCompletion() {
+    completionTimerId.value = null;
+    directCompletionOpen.value = false;
 }
 
 async function changeTimer(action: TaskTimerAction, completion?: TaskTimerCompletion) {
@@ -146,8 +168,14 @@ function deleteTask() {
 }
 
 function markTaskAsDone() {
-    if (!props.task.is_done && props.timer) {
-        openCompletion();
+    if (!props.task.is_done) {
+        if (props.timer) {
+            openCompletion();
+        } else {
+            dialogAction.value = 'complete';
+            notes.value = null;
+            directCompletionOpen.value = true;
+        }
         return;
     }
     useTasksStore().updateTask(props.task.id, {
@@ -314,16 +342,17 @@ const showTaskEditModal = ref(false);
         <slot name="timeline" />
         <TaskEditModal v-model:show="showTaskEditModal" :task="task"></TaskEditModal>
         <DialogModal
-            :show="completionTimerId !== null"
+            :show="directCompletionOpen || completionTimerId !== null"
             :closeable="!saving"
             max-width="lg"
-            @close="completionTimerId = null"
+            @close="closeCompletion"
             @submit="submitCompletion">
             <template #title>{{
-                dialogAction === 'pause' ? 'Pause task timer' : 'Save to Calendar'
+                dialogAction === 'pause' ? 'Pause task timer' : 'Complete task'
             }}</template>
             <template #content>
-                <Field>
+                <p class="mb-4 font-medium text-text-primary">{{ task.name }}</p>
+                <Field v-if="dialogAction === 'pause'" class="mb-4">
                     <FieldLabel :for="eventNameId">Event name</FieldLabel>
                     <TextInput
                         :id="eventNameId"
@@ -332,26 +361,15 @@ const showTaskEditModal = ref(false);
                         class="w-full"
                         autocomplete="off"
                         :maxlength="5000"
-                        :disabled="saving"
-                        autofocus
-                        @keydown.enter.exact.prevent="!$event.isComposing && submitCompletion()" />
+                        :disabled="saving" />
                 </Field>
-                <template v-if="timerAvailable">
-                    <fieldset :disabled="saving" class="mt-4">
-                        <TimeEntryNotesField v-model="notes" />
-                    </fieldset>
-                    <p v-if="dialogAction === 'pause'" class="mt-3">
-                        The timer is stopped. Save your pending work and notes to Calendar, or
-                        cancel to keep the time pending.
-                    </p>
-                    <p v-else class="mt-3">
-                        Saving logs any remaining timer segments and marks the task as Done.
-                    </p>
-                </template>
+                <fieldset v-if="directCompletionOpen || timerAvailable" :disabled="saving">
+                    <TimeEntryNotesField v-model="notes" />
+                </fieldset>
                 <p v-else role="alert" class="mt-3">This timer is no longer available.</p>
             </template>
             <template #footer>
-                <SecondaryButton :disabled="saving" @click="completionTimerId = null">
+                <SecondaryButton :disabled="saving" @click="closeCompletion">
                     Cancel
                 </SecondaryButton>
                 <PrimaryButton
@@ -363,7 +381,7 @@ const showTaskEditModal = ref(false);
                             ? 'Saving…'
                             : dialogAction === 'pause'
                               ? 'Save to Calendar'
-                              : 'Save and complete'
+                              : 'Complete task'
                     }}
                 </PrimaryButton>
             </template>

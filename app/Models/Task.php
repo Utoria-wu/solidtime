@@ -26,6 +26,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property string $organization_id
  * @property Carbon|null $done_at
  * @property Carbon|null $canceled_at
+ * @property string|null $completion_notes
  * @property string|null $markdown_notes
  * @property string|null $category_id
  * @property string|null $stage

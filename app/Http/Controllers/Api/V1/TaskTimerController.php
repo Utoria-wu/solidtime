@@ -58,6 +58,7 @@ class TaskTimerController extends Controller
             'version' => 'required|integer|min:0',
             'description' => 'sometimes|required|string|max:5000',
             'markdown_notes' => 'nullable|string|max:10000',
+            'completion_notes' => 'nullable|string|max:10000',
         ]);
         $action = $input['action'];
         if (in_array($action, ['start', 'resume', 'complete'], true) && ! $this->hasPermission($organization, 'tasks:update:all')) {
@@ -138,6 +139,9 @@ class TaskTimerController extends Controller
                 return $count;
             }
 
+            if (array_key_exists('completion_notes', $input)) {
+                $task->completion_notes = $count === 0 ? $input['completion_notes'] : null;
+            }
             $task->done_at ??= $now;
             $task->save();
             $session->delete();
