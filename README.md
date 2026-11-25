@@ -6,11 +6,19 @@ Running timers now appear in an expanded list below the sidebar navigation, with
 
 The Projects list puts tags in a dedicated column immediately before Created, keeping badges aligned across projects.
 
+The shared Notes field provides a single live editing surface with basic formatting and a text color palette. History and task activity display the saved colors. Existing Markdown remains readable and pasted Markdown renders in the editor.
+
 ## Verification
 
 The Vue type check and frontend build passed. In the local browser, two concurrent timers appeared together without expanding the sidebar. Stop, Pause and save to Calendar, and Mark as done worked from the updated controls. Switching between List, Schedule, and History preserved the List status selection.
 
 The Projects list was checked in the browser for tag alignment, Created sorting, and horizontal scrolling at a narrow width.
+
+Local browser checks verified selected text color, reset to the default color, a Markdown heading and checklist, completion notes appearing in History after reload, and the pause-to-Calendar workflow. An older Markdown note still rendered, and unsupported colors and active HTML were removed.
+
+![Notes editor with inline formatting](.github/feature-images/rich-task-notes-editor.png)
+
+![Colored task and completion notes in History](.github/feature-images/rich-task-notes-history.png)
 
 ![Projects list with aligned tags](.github/feature-images/project-tags-aligned.png)
 
