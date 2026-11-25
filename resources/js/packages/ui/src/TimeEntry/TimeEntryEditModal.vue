@@ -24,7 +24,6 @@ import { Button } from '@/packages/ui/src/Buttons';
 import DatePicker from '@/packages/ui/src/Input/DatePicker.vue';
 import DurationHumanInput from '@/packages/ui/src/Input/DurationHumanInput.vue';
 
-import { InformationCircleIcon } from '@heroicons/vue/20/solid';
 import { Coffee } from '@lucide/vue';
 import type { Tag, Task } from '@/packages/api/src';
 import TimePickerSimple from '@/packages/ui/src/Input/TimePickerSimple.vue';
@@ -316,20 +315,10 @@ const typeProxy = computed({
                 <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 pt-4">
                     <Field class="col-span-2 sm:col-span-3">
                         <FieldLabel>Duration</FieldLabel>
-                        <div class="space-y-2 flex flex-col">
-                            <DurationHumanInput
-                                v-model:start="localStart"
-                                v-model:end="localEnd"
-                                name="Duration"></DurationHumanInput>
-                            <div class="text-sm flex space-x-1">
-                                <InformationCircleIcon
-                                    class="w-4 shrink-0 text-text-quaternary"></InformationCircleIcon>
-                                <span class="text-text-secondary text-xs">
-                                    You can type natural language like
-                                    <span class="font-semibold"> 2h 30m</span>
-                                </span>
-                            </div>
-                        </div>
+                        <DurationHumanInput
+                            v-model:start="localStart"
+                            v-model:end="localEnd"
+                            name="Duration" />
                     </Field>
                     <Field>
                         <FieldLabel>Start</FieldLabel>
@@ -351,7 +340,9 @@ const typeProxy = computed({
                         </div>
                     </Field>
                 </div>
-                <TimeEntryNotesField v-model="editableTimeEntry.markdown_notes" />
+                <TimeEntryNotesField
+                    v-model="editableTimeEntry.markdown_notes"
+                    :disabled="saving || deleting" />
             </div>
         </template>
         <template #footer>

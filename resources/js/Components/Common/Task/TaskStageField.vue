@@ -21,9 +21,7 @@ const suggestions = computed(() => {
 
 <template>
     <Field>
-        <FieldLabel :for="inputId"
-            >Stage <span class="text-text-secondary">(optional)</span></FieldLabel
-        >
+        <FieldLabel :for="inputId">Stage</FieldLabel>
         <TextInput
             :id="inputId"
             v-model="stage"

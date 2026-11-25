@@ -3,7 +3,7 @@ import { ref, useId, watchPostEffect } from 'vue';
 import { Field, FieldLabel } from '../field';
 import { noteColors, renderNotes, serializeNotes } from '../utils/notes';
 
-withDefaults(defineProps<{ label?: string }>(), { label: 'Notes' });
+withDefaults(defineProps<{ label?: string; disabled?: boolean }>(), { label: 'Notes' });
 const notes = defineModel<string | null>();
 const editor = ref<HTMLDivElement | null>(null);
 const inputId = useId();
@@ -76,7 +76,10 @@ function paste(event: ClipboardEvent) {
     <Field>
         <div class="flex flex-wrap items-center justify-between gap-2">
             <FieldLabel :id="inputId + '-label'">{{ label }}</FieldLabel>
-            <div role="group" aria-label="Note formatting" class="flex items-center gap-1">
+            <fieldset
+                :disabled="disabled"
+                aria-label="Note formatting"
+                class="flex items-center gap-1">
                 <button
                     type="button"
                     aria-label="Bold"
@@ -130,14 +133,15 @@ function paste(event: ClipboardEvent) {
                         :style="{ backgroundColor: color.hex }"
                         aria-hidden="true" />
                 </button>
-            </div>
+            </fieldset>
         </div>
         <div
             ref="editor"
             role="textbox"
             aria-multiline="true"
             :aria-labelledby="inputId + '-label'"
-            contenteditable="true"
+            :contenteditable="!disabled"
+            :aria-disabled="disabled"
             class="notes-editor min-h-36 max-h-80 overflow-y-auto rounded-md border border-input-border bg-input-background p-3 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             @input="syncNotes"
             @mouseup="rememberSelection"

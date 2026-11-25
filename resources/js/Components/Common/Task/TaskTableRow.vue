@@ -30,7 +30,7 @@ import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import TimeEntryNotesField from '@/packages/ui/src/TimeEntry/TimeEntryNotesField.vue';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
-import { Field, FieldLabel } from '@/packages/ui/src/field';
+import { Field, FieldGroup, FieldLabel } from '@/packages/ui/src/field';
 
 const emit = defineEmits<{ openActivity: [] }>();
 
@@ -189,6 +189,7 @@ function markTaskAsDone() {
             openCompletion();
         } else {
             dialogAction.value = 'complete';
+            eventName.value = props.task.name;
             notes.value = null;
             directCompletionOpen.value = true;
         }
@@ -338,27 +339,30 @@ const showTaskEditModal = ref(false);
         <DialogModal
             :show="directCompletionOpen || completionTimerId !== null"
             :closeable="!saving"
-            max-width="lg"
             @close="closeCompletion"
             @submit="submitCompletion">
             <template #title>{{
                 dialogAction === 'pause' ? 'Pause task timer' : 'Complete task'
             }}</template>
             <template #content>
-                <p class="mb-4 font-medium text-text-primary">{{ task.name }}</p>
-                <Field v-if="dialogAction === 'pause'" class="mb-4">
-                    <FieldLabel :for="eventNameId">Event name</FieldLabel>
-                    <TextInput
-                        :id="eventNameId"
-                        v-model="eventName"
-                        type="text"
-                        class="w-full"
-                        autocomplete="off"
-                        :maxlength="5000"
-                        :disabled="saving" />
-                </Field>
                 <fieldset v-if="directCompletionOpen || timerAvailable" :disabled="saving">
-                    <TimeEntryNotesField v-model="notes" />
+                    <FieldGroup>
+                        <Field>
+                            <FieldLabel :for="eventNameId">{{
+                                dialogAction === 'pause' ? 'Event name' : 'Task name'
+                            }}</FieldLabel>
+                            <TextInput
+                                :id="eventNameId"
+                                v-model="eventName"
+                                type="text"
+                                class="w-full"
+                                autocomplete="off"
+                                :maxlength="5000"
+                                :readonly="dialogAction === 'complete'"
+                                :disabled="saving" />
+                        </Field>
+                        <TimeEntryNotesField v-model="notes" :disabled="saving" />
+                    </FieldGroup>
                 </fieldset>
                 <p v-else role="alert" class="mt-3">This timer is no longer available.</p>
             </template>

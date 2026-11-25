@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { watch } from 'vue';
-import { InformationCircleIcon } from '@heroicons/vue/20/solid';
 import { Field, FieldLabel } from '../field';
 import DatePicker from '@/packages/ui/src/Input/DatePicker.vue';
 import DurationHumanInput from '@/packages/ui/src/Input/DurationHumanInput.vue';
@@ -12,7 +11,6 @@ const start = defineModel<string>('start', { required: true });
 const end = defineModel<string>('end', { required: true });
 
 defineProps<{
-    showHint?: boolean;
     datePickerSize?: 'sm';
 }>();
 
@@ -32,20 +30,7 @@ watch(start, (value, oldValue) => {
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <Field class="col-span-2 sm:col-span-3">
             <FieldLabel>Duration</FieldLabel>
-            <div class="space-y-2 flex flex-col">
-                <DurationHumanInput
-                    v-model:start="start"
-                    v-model:end="end"
-                    name="Duration"></DurationHumanInput>
-                <div v-if="showHint" class="text-sm flex space-x-1">
-                    <InformationCircleIcon
-                        class="w-4 shrink-0 text-text-quaternary"></InformationCircleIcon>
-                    <span class="text-text-secondary text-xs">
-                        You can type natural language like
-                        <span class="font-semibold"> 2h 30m</span>
-                    </span>
-                </div>
-            </div>
+            <DurationHumanInput v-model:start="start" v-model:end="end" name="Duration" />
         </Field>
         <Field>
             <FieldLabel>Start</FieldLabel>
