@@ -4,9 +4,11 @@ import { useTimestamp } from '@vueuse/core';
 import { computed } from 'vue';
 import { formatDuration } from '@/packages/ui/src/utils/time';
 import { useTasksQuery } from '@/utils/useTasksQuery';
+import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 import { elapsedTaskSeconds, useTaskTimers } from '@/utils/useTaskTimers';
 
 const { timers } = useTaskTimers();
+const { t } = useInterfaceLanguage();
 const { tasks } = useTasksQuery();
 const timestamp = useTimestamp({ interval: 1000 });
 const runningTasks = computed(() => {
@@ -22,9 +24,9 @@ const runningTasks = computed(() => {
     <section
         v-if="runningTasks.length"
         aria-labelledby="running-tasks-heading"
-        class="mt-2 border-t border-default-background-separator px-2 py-2">
+        class="mt-2 border-t border-default-background-separator px-2 pb-3 pt-2.5">
         <h2 id="running-tasks-heading" class="mb-1 px-1 text-xs font-medium text-text-secondary">
-            Running tasks
+            {{ t('Running tasks') }}
         </h2>
         <ul class="max-h-[25dvh] overflow-y-auto">
             <li v-for="{ timer, task } in runningTasks" :key="timer.id">

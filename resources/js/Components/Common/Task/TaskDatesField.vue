@@ -28,7 +28,8 @@ const dateRangeLabel = computed(() => {
     const { start_date: start, due_date: end } = dates.value;
     const dateFormat = organization?.value.date_format;
     if (start && !end) return formatDate(start, dateFormat) + ' → ' + t('Ongoing');
-    if (!start || !end) return 'Start date → Due date';
+    if (!start || !end) return t('No dates set');
+    if (start === end) return formatDate(start, dateFormat);
     return formatDate(start, dateFormat) + ' → ' + formatDate(end, dateFormat);
 });
 
@@ -45,7 +46,8 @@ function updateDatePickerOpen(open: boolean) {
     datePickerOpen.value = open;
 }
 
-function toggleOngoing() {
+function setOngoing(next: boolean) {
+    if (next === ongoing.value) return;
     if (ongoing.value) {
         draftDates.value = {
             start: ongoingStart.value,
@@ -57,7 +59,7 @@ function toggleOngoing() {
     } else {
         ongoingStart.value = draftDates.value.start;
     }
-    ongoing.value = !ongoing.value;
+    ongoing.value = next;
 }
 
 const canApply = computed(() =>
@@ -106,16 +108,22 @@ function clearTaskDates() {
             </PopoverTrigger>
             <PopoverContent align="start" class="w-auto p-0">
                 <div class="border-b border-border px-3 py-2.5">
-                    <label class="flex cursor-pointer items-center gap-2 text-sm font-medium">
-                        <input type="checkbox" :checked="ongoing" @change="toggleOngoing" />
-                        {{ t('Ongoing') }}
-                    </label>
-                    <p class="mt-1 text-xs text-text-secondary">
-                        {{
-                            ongoing
-                                ? t('Select a start date. No due date is needed.')
-                                : t('Select a start date, then a due date.')
-                        }}
+                    <div
+                        role="group"
+                        :aria-label="t('Task dates')"
+                        class="grid grid-cols-2 gap-1 rounded-lg bg-tertiary p-1">
+                        <button
+                            v-for="mode in [false, true]"
+                            :key="String(mode)"
+                            type="button"
+                            :aria-pressed="ongoing === mode"
+                            class="rounded-md px-2 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-text-secondary aria-pressed:bg-default-background aria-pressed:text-text-primary aria-pressed:shadow-sm"
+                            @click="setOngoing(mode)">
+                            {{ t(mode ? 'Ongoing' : 'Date range') }}
+                        </button>
+                    </div>
+                    <p v-if="ongoing" class="mt-2 text-xs text-text-secondary">
+                        {{ t('Select a start date. No due date is needed.') }}
                     </p>
                 </div>
                 <Calendar
