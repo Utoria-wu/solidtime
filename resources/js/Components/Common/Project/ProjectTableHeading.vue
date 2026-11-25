@@ -38,6 +38,11 @@ const { t } = useInterfaceLanguage();
             @sort="handleSort">
             {{ t('Name') }}
         </SortableTableHeaderCell>
+        <div
+            data-testid="project_tags_heading"
+            class="flex items-center px-3 py-1.5 text-left text-text-tertiary">
+            {{ t('Tags') }}
+        </div>
         <SortableTableHeaderCell
             class="whitespace-nowrap"
             column="created_at"
