@@ -205,9 +205,7 @@ function notesHtml(notes: string | null) {
 </script>
 
 <template>
-    <div
-        data-testid="project_history"
-        class="overflow-hidden rounded-xl border border-default-background-separator bg-default-background">
+    <div data-testid="project_history" class="overflow-hidden">
         <header
             class="flex flex-wrap items-center justify-between gap-3 border-b border-default-background-separator px-5 py-4">
             <h2 class="font-semibold">Project history</h2>
@@ -385,9 +383,6 @@ function notesHtml(notes: string | null) {
 .history-explorer {
     padding-bottom: 24px;
 }
-.history-timeline {
-    background: color-mix(in srgb, var(--theme-color-default-background, white) 97%, #789da8);
-}
 .timeline-spine {
     margin-left: 15px;
     border-left: 1px solid color-mix(in srgb, #9ca3af 28%, transparent);
@@ -480,7 +475,9 @@ function notesHtml(notes: string | null) {
     }
 }
 @media (max-width: 700px) {
-    .history-layout,
+    .history-layout {
+        display: block;
+    }
     .history-explorer {
         max-height: 220px;
         overflow: auto;
