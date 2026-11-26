@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { cn } from '../utils/cn';
+import type { DateValue } from '@internationalized/date';
 import {
     CalendarRoot,
     type CalendarRootEmits,
@@ -24,6 +25,7 @@ import {
 const props = defineProps<CalendarRootProps & { class?: HTMLAttributes['class'] }>();
 
 const emits = defineEmits<CalendarRootEmits>();
+defineSlots<{ day?(props: { date: DateValue; month: DateValue }): unknown }>();
 
 const delegatedProps = computed(() => {
     const { class: _, ...delegated } = props;
@@ -60,7 +62,9 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
                             v-for="weekDate in weekDates"
                             :key="weekDate.toString()"
                             :date="weekDate">
-                            <CalendarCellTrigger :day="weekDate" :month="month.value" />
+                            <slot name="day" :date="weekDate" :month="month.value">
+                                <CalendarCellTrigger :day="weekDate" :month="month.value" />
+                            </slot>
                         </CalendarCell>
                     </CalendarGridRow>
                 </CalendarGridBody>
