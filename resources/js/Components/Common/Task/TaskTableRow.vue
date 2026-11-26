@@ -8,7 +8,7 @@ import TaskMoreOptionsDropdown from '@/Components/Common/Task/TaskMoreOptionsDro
 import TableRow from '@/Components/TableRow.vue';
 import { canDeleteTasks, canUpdateTasks } from '@/utils/permissions';
 import TaskEditModal from '@/Components/Common/Task/TaskEditModal.vue';
-import { computed, ref, inject, nextTick, type ComputedRef } from 'vue';
+import { computed, ref, inject, nextTick, onUnmounted, type ComputedRef, watch } from 'vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import EstimatedTimeProgress from '@/packages/ui/src/EstimatedTimeProgress.vue';
 import UpgradeBadge from '@/packages/ui/src/UpgradeBadge.vue';
@@ -33,10 +33,11 @@ import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import { Field, FieldGroup, FieldLabel } from '@/packages/ui/src/field';
 
-const emit = defineEmits<{ openActivity: [] }>();
+const emit = defineEmits<{ openActivity: []; located: [] }>();
 
 const props = defineProps<{
     task: Task;
+    locate?: boolean;
     taskCategory?: TaskCategory;
     timer?: TaskTimer;
     timerReady: boolean;
@@ -204,10 +205,40 @@ function markTaskAsDone() {
 }
 
 const showTaskEditModal = ref(false);
+const taskNameButton = ref<HTMLButtonElement | null>(null);
+const highlighted = ref(false);
+let frame: number | undefined;
+let highlightTimeout: number | undefined;
+
+onUnmounted(() => {
+    if (frame !== undefined) cancelAnimationFrame(frame);
+    window.clearTimeout(highlightTimeout);
+});
+
+watch(
+    [() => props.locate, taskNameButton],
+    ([locate, button]) => {
+        if (!locate || !button) return;
+
+        frame = requestAnimationFrame(() => {
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            button.focus({ preventScroll: true });
+            button.scrollIntoView({
+                block: 'center',
+                inline: 'nearest',
+                behavior: reduceMotion ? 'instant' : 'smooth',
+            });
+            highlighted.value = true;
+            highlightTimeout = window.setTimeout(() => (highlighted.value = false), 2400);
+            emit('located');
+        });
+    },
+    { flush: 'post' }
+);
 </script>
 
 <template>
-    <TableRow>
+    <TableRow :class="{ 'located-task': highlighted }">
         <div
             class="flex min-w-0 whitespace-nowrap pr-3 text-sm font-medium text-text-primary"
             :class="
@@ -217,6 +248,7 @@ const showTaskEditModal = ref(false);
             ">
             <div class="flex min-w-0 items-center gap-2">
                 <button
+                    ref="taskNameButton"
                     type="button"
                     class="truncate text-left hover:underline"
                     :title="task.name"
@@ -402,3 +434,33 @@ const showTaskEditModal = ref(false);
 </template>
 
 <style scoped></style>
+
+<style scoped>
+.located-task[role='row'] > :deep(*) {
+    animation: locate-task 2.4s ease-out both;
+}
+.located-task > :deep(:first-child) {
+    box-shadow: inset 3px 0 var(--theme-color-accent-500, #1681b2);
+}
+@keyframes locate-task {
+    0%,
+    45% {
+        background-color: color-mix(in oklch, #2093c5 18%, transparent);
+    }
+    25% {
+        background-color: color-mix(in oklch, #2093c5 7%, transparent);
+    }
+    75% {
+        background-color: color-mix(in oklch, #2093c5 12%, transparent);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .located-task[role='row'] > :deep(*) {
+        animation: none;
+        background-color: color-mix(in oklch, #2093c5 18%, transparent);
+    }
+}
+</style>

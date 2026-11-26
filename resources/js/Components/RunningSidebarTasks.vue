@@ -31,7 +31,12 @@ const runningTasks = computed(() => {
         <ul class="max-h-[25dvh] overflow-y-auto">
             <li v-for="{ timer, task } in runningTasks" :key="timer.id">
                 <Link
-                    :href="route('projects.show', { project: task.project_id })"
+                    :href="
+                        route('projects.show', {
+                            project: task.project_id,
+                            _query: { task: task.id },
+                        })
+                    "
                     class="flex items-center gap-2 rounded-md px-1 py-1.5 text-xs text-text-primary hover:bg-tertiary"
                     :title="task.name">
                     <span aria-hidden="true" class="size-1.5 shrink-0 rounded-full bg-teal-500" />

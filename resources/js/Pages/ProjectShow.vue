@@ -5,7 +5,7 @@ import MainContainer from '@/packages/ui/src/MainContainer.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { FolderIcon, PlusIcon } from '@heroicons/vue/20/solid';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import { ChevronRightIcon, UserGroupIcon, PencilSquareIcon } from '@heroicons/vue/20/solid';
 
@@ -61,9 +61,13 @@ const billableRateFormatted = computed(() => {
 });
 
 const activeTab = ref<'active' | 'done' | 'canceled'>('active');
-const requestedView = new URLSearchParams(usePage().url.split('?')[1]).get('view');
+const query = new URLSearchParams(usePage().url.split('?')[1]);
+const focusedTaskId = query.get('task');
+const requestedView = query.get('view');
 const initialView =
-    requestedView === 'history' || requestedView === 'schedule' ? requestedView : 'list';
+    !focusedTaskId && (requestedView === 'history' || requestedView === 'schedule')
+        ? requestedView
+        : 'list';
 const taskView = ref(initialView);
 
 const { tasks } = useTasksQuery();
@@ -73,6 +77,17 @@ const { tableState, handleSort } = useTableSortState<SortColumn>('task-table-sta
 });
 
 const projectTasks = computed(() => tasks.value.filter((task) => task.project_id === projectId));
+const focusedTask = computed(() => projectTasks.value.find((task) => task.id === focusedTaskId));
+let initialTaskTabSelected = false;
+watch(
+    focusedTask,
+    (task) => {
+        if (!task || initialTaskTabSelected) return;
+        initialTaskTabSelected = true;
+        activeTab.value = task.is_canceled ? 'canceled' : task.is_done ? 'done' : 'active';
+    },
+    { immediate: true }
+);
 const completedTasksCount = computed(
     () => projectTasks.value.filter((task) => task.is_done).length
 );
@@ -176,6 +191,7 @@ const billableRatesLocked = computed(() => !canUseBillableRates());
                         :project-id="projectId"
                         allow-schedule
                         :initial-view="initialView"
+                        :focused-task-id="focusedTaskId"
                         allow-history
                         :history-tasks="projectTasks"
                         :sort-column="tableState.sortColumn"

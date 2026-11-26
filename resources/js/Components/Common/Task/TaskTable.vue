@@ -34,6 +34,7 @@ const props = defineProps<{
     allowSchedule?: boolean;
     allowHistory?: boolean;
     historyTasks?: Task[];
+    focusedTaskId?: string | null;
     initialView?: 'list' | 'schedule' | 'history';
     scheduleProjects?: { id: string; name: string }[];
 }>();
@@ -88,6 +89,7 @@ function handleSort(column: SortColumn) {
 const { categories: taskCategories } = useTaskCategories();
 const categoryMap = computed(() => new Map(taskCategories.value.map((item) => [item.id, item])));
 const createTask = ref(false);
+const locatedTaskId = ref<string | null>(null);
 const activityTaskId = ref<string | null>(null);
 const activityOpen = ref(false);
 const activityTask = computed(() => props.tasks.find((task) => task.id === activityTaskId.value));
@@ -345,6 +347,13 @@ function plannedDates(task: Task) {
                             v-for="task in group.tasks"
                             :key="task.id"
                             :task="task"
+                            :locate="
+                                view === 'list' &&
+                                !showSchedule &&
+                                task.id === focusedTaskId &&
+                                task.id !== locatedTaskId
+                            "
+                            @located="locatedTaskId = task.id"
                             :class="{
                                 'schedule-row': showSchedule,
                                 'project-list-row': projectId && !showSchedule,
@@ -362,7 +371,9 @@ function plannedDates(task: Task) {
                                         · {{ t('Done') }}</span
                                     >
                                     <span
-                                        v-else-if="scheduleProjects && taskGroup(task) === 'overdue'"
+                                        v-else-if="
+                                            scheduleProjects && taskGroup(task) === 'overdue'
+                                        "
                                         class="text-red-500">
                                         · Overdue</span
                                     >
