@@ -32,6 +32,7 @@ const open = ref(false);
 const activeField = ref<keyof TaskDates>('start_date');
 const visibleDate = shallowRef<DateValue>(parseDate(getLocalizedDayJs().format('YYYY-MM-DD')));
 const draft = ref<TaskDates>({ start_date: null, due_date: null });
+const hoveredDay = ref<string | null>(null);
 const { t } = useInterfaceLanguage();
 const organization = inject<ComputedRef<Organization>>('organization');
 const weekStartsOn = computed(() => firstDayIndex.value as WeekStartDay);
@@ -54,6 +55,34 @@ const error = computed(() => {
     return null;
 });
 
+const visibleRange = computed(() => {
+    const { start_date: start, due_date: due } = draft.value;
+    const hovered = hoveredDay.value;
+    const isStart = activeField.value === 'start_date';
+    const previewStart = isStart ? hovered : start;
+    const previewDue = isStart ? due : hovered;
+    if (
+        previewStart &&
+        previewDue &&
+        previewStart < previewDue &&
+        hovered !== draft.value[activeField.value]
+    ) {
+        return { start: previewStart, due: previewDue, preview: true };
+    }
+    return { start, due, preview: false };
+});
+
+function rangePart(date: string) {
+    const { start, due } = visibleRange.value;
+    if (!start || !due || start >= due || date < start || date > due) return undefined;
+    if (date === start) return 'start';
+    return date === due ? 'end' : 'between';
+}
+
+function previewDay(value: DateValue, event: PointerEvent) {
+    if (event.pointerType !== 'touch') hoveredDay.value = value.toString();
+}
+
 function endpointDescription(date: string) {
     return (
         [
@@ -66,6 +95,7 @@ function endpointDescription(date: string) {
 }
 
 function editField(field: keyof TaskDates) {
+    hoveredDay.value = null;
     if (!open.value) {
         draft.value = { ...dates.value };
         visibleDate.value = parseDate(
@@ -99,14 +129,22 @@ function restoreDateFieldFocus(event: Event) {
 
 function selectDate(value: DateValue | undefined) {
     if (!value) return;
+    hoveredDay.value = null;
     draft.value[activeField.value] = value.toString();
     visibleDate.value = value;
     if (activeField.value === 'start_date') activeField.value = 'due_date';
 }
 
 function clearDraft() {
+    hoveredDay.value = null;
     draft.value = { start_date: null, due_date: null };
     activeField.value = 'start_date';
+}
+
+function setOngoing() {
+    hoveredDay.value = null;
+    draft.value.due_date = null;
+    activeField.value = 'due_date';
 }
 
 function apply() {
@@ -172,6 +210,7 @@ function apply() {
                         v-model:placeholder="visibleDate"
                         :model-value="null"
                         class="w-fit max-w-full mx-auto"
+                        :data-preview-range="visibleRange.preview ? '' : undefined"
                         :week-starts-on="weekStartsOn"
                         @update:model-value="selectDate">
                         <template #day="{ date, month }">
@@ -179,11 +218,21 @@ function apply() {
                                 :day="date"
                                 :month="month"
                                 class="task-date-day"
+                                :data-range="rangePart(date.toString())"
+                                :data-preview-endpoint="
+                                    visibleRange.preview && hoveredDay === date.toString()
+                                        ? activeField
+                                        : undefined
+                                "
+                                @pointerenter="previewDay(date, $event)"
+                                @pointerleave="hoveredDay = null"
                                 :data-task-start="
                                     date.toString() === draft.start_date ? '' : undefined
                                 "
                                 :data-task-due="date.toString() === draft.due_date ? '' : undefined"
-                                :aria-describedby="endpointDescription(date.toString())" />
+                                :aria-describedby="endpointDescription(date.toString())">
+                                <span class="task-date-number">{{ date.day }}</span>
+                            </CalendarCellTrigger>
                         </template>
                     </Calendar>
                     <p
@@ -207,10 +256,7 @@ function apply() {
                             variant="ghost"
                             size="sm"
                             :aria-label="t('Ongoing · No due date')"
-                            @click="
-                                draft.due_date = null;
-                                activeField = 'due_date';
-                            ">
+                            @click="setOngoing">
                             {{ t('Ongoing') }}
                         </Button>
                         <Button type="button" size="sm" :disabled="!!error" @click="apply">
@@ -226,7 +272,7 @@ function apply() {
 <style scoped>
 .date-input,
 .task-date-picker {
-    --task-start-color: #1681b2;
+    --task-start-color: #1477a4;
     --task-due-color: #835ba9;
 }
 .endpoint-key {
@@ -246,27 +292,69 @@ function apply() {
     background: color-mix(in oklch, var(--endpoint-color) 9%, transparent);
     box-shadow: inset 0 -1.5px var(--endpoint-color);
 }
-.task-date-picker :deep(.task-date-day:is([data-task-start], [data-task-due])) {
+.task-date-picker {
+    --range-fill: color-mix(in oklch, var(--task-start-color) 15%, transparent);
+}
+.task-date-picker :deep([data-preview-range]) {
+    --range-fill: color-mix(in oklch, var(--task-start-color) 10%, transparent);
+}
+.task-date-picker :deep(.task-date-day) {
     position: relative;
-    color: var(--theme-color-text-primary);
+}
+.task-date-picker :deep(.task-date-day[data-range]) {
+    isolation: isolate;
     opacity: 1;
 }
-.task-date-picker :deep(.task-date-day:is([data-task-start], [data-task-due]))::after {
+.task-date-picker :deep(.task-date-day[data-range])::before {
     content: '';
     position: absolute;
-    inset: 0;
+    inset-block: 3px;
+    inset-inline: var(--range-inset-start, 0) var(--range-inset-end, 0);
+    z-index: -1;
+    background: var(--range-fill);
     pointer-events: none;
-    border-radius: inherit;
 }
-.task-date-picker :deep(.task-date-day[data-task-start])::after {
-    box-shadow: inset 0 0 0 1.5px var(--task-start-color);
+.task-date-picker :deep(.task-date-day[data-range='start']) {
+    --range-inset-start: 50%;
 }
-.task-date-picker :deep(.task-date-day[data-task-due])::after {
-    box-shadow: inset 0 0 0 1.5px var(--task-due-color);
+.task-date-picker :deep(.task-date-day[data-range='end']) {
+    --range-inset-end: 50%;
 }
-.task-date-picker :deep(.task-date-day[data-task-start][data-task-due])::after {
-    box-shadow:
-        inset 0 0 0 1.5px var(--task-start-color),
-        inset 0 0 0 3px var(--task-due-color);
+.task-date-picker :deep(.task-date-day:is([data-range], [data-task-start], [data-task-due])) {
+    border: 0;
+    background: transparent;
+}
+.task-date-picker
+    :deep(.task-date-day:is([data-task-start], [data-task-due], [data-preview-endpoint])) {
+    opacity: 1;
+}
+.task-date-number {
+    display: grid;
+    width: 1.75rem;
+    height: 1.625rem;
+    place-items: center;
+    border-radius: 0.375rem;
+    line-height: 1;
+}
+.task-date-picker :deep([data-preview-endpoint='start_date']) {
+    --end-color: var(--task-start-color);
+}
+.task-date-picker :deep([data-preview-endpoint='due_date']) {
+    --end-color: var(--task-due-color);
+}
+.task-date-picker :deep(.task-date-day[data-preview-endpoint]) .task-date-number {
+    box-shadow: inset 0 0 0 1px var(--end-color);
+    background: color-mix(in oklch, var(--end-color) 12%, var(--theme-color-default-background));
+}
+.task-date-picker :deep(.task-date-day[data-task-start]) .task-date-number {
+    background: var(--task-start-color);
+    color: white;
+}
+.task-date-picker :deep(.task-date-day[data-task-due]) .task-date-number {
+    background: var(--task-due-color);
+    color: white;
+}
+.task-date-picker :deep(.task-date-day[data-task-start][data-task-due]) .task-date-number {
+    background: linear-gradient(120deg, var(--task-start-color) 35%, var(--task-due-color) 65%);
 }
 </style>
