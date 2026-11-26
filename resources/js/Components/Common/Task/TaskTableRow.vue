@@ -225,7 +225,7 @@ const showTaskEditModal = ref(false);
                 </button>
                 <span
                     v-if="taskCategory"
-                    class="inline-flex min-w-0 shrink-0 items-center gap-1 rounded border border-default-background-separator px-1.5 py-0.5 text-[11px] font-medium text-text-primary"
+                    class="inline-flex min-w-0 shrink-0 items-center gap-1 text-[11px] font-medium text-text-primary"
                     :title="taskCategory.name">
                     <span
                         class="size-1.5 shrink-0 rounded-full"
