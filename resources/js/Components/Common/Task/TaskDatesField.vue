@@ -3,8 +3,8 @@ import { computed, inject, ref, shallowRef, useId, type ComputedRef } from 'vue'
 import { parseDate, type DateValue } from '@internationalized/date';
 import { Button } from '@/packages/ui/src/Buttons';
 import { Field, FieldLabel } from '@/packages/ui/src/field';
-import { CalendarIcon, ChevronDown } from '@lucide/vue';
-import { Popover, PopoverContent, PopoverTrigger } from '@/packages/ui/src/popover';
+import { ArrowRight, CalendarIcon } from '@lucide/vue';
+import { Popover, PopoverAnchor, PopoverContent } from '@/packages/ui/src/popover';
 import { Calendar, CalendarCellTrigger } from '@/packages/ui/src/calendar';
 import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 import {
@@ -23,6 +23,9 @@ const fields = [
 ] as const;
 
 const id = useId();
+const panelId = id + '-calendar';
+const input = ref<HTMLDivElement | null>(null);
+const restoreInputFocus = ref(false);
 const startDescriptionId = id + '-start-date';
 const dueDescriptionId = id + '-due-date';
 const open = ref(false);
@@ -34,12 +37,14 @@ const organization = inject<ComputedRef<Organization>>('organization');
 const weekStartsOn = computed(() => firstDayIndex.value as WeekStartDay);
 const format = (date: string) => formatDate(date, organization?.value.date_format);
 
-const summary = computed(() => {
-    const { start_date: start, due_date: due } = dates.value;
-    if (!start) return due ? format(due) : t('No dates set');
-    if (!due) return format(start) + ' · ' + t('Ongoing');
-    return start === due ? format(start) : format(start) + ' – ' + format(due);
-});
+const displayed = computed(() => (open.value ? draft.value : dates.value));
+
+function endpointLabel(field: keyof TaskDates) {
+    const date = displayed.value[field];
+    if (date) return format(date);
+    if (field === 'due_date' && displayed.value.start_date) return t('Ongoing');
+    return t(field === 'start_date' ? 'Start date' : 'Due date');
+}
 
 const error = computed(() => {
     const { start_date: start, due_date: due } = draft.value;
@@ -60,23 +65,36 @@ function endpointDescription(date: string) {
     );
 }
 
-function updateOpen(value: boolean) {
-    if (value) {
+function editField(field: keyof TaskDates) {
+    if (!open.value) {
         draft.value = { ...dates.value };
-        activeField.value = 'start_date';
         visibleDate.value = parseDate(
-            draft.value.start_date ??
+            draft.value[field] ??
+                draft.value.start_date ??
                 draft.value.due_date ??
                 getLocalizedDayJs().format('YYYY-MM-DD')
         );
+    } else {
+        const date = draft.value[field];
+        if (date) visibleDate.value = parseDate(date);
     }
-    open.value = value;
+    activeField.value = field;
+    open.value = true;
 }
 
-function editField(field: keyof TaskDates) {
-    activeField.value = field;
-    const date = draft.value[field];
-    if (date) visibleDate.value = parseDate(date);
+function keepOpenOnInput(event: Event) {
+    if (event.target instanceof Node && input.value?.contains(event.target)) {
+        event.preventDefault();
+    }
+}
+
+function restoreDateFieldFocus(event: Event) {
+    if (!restoreInputFocus.value) return;
+    restoreInputFocus.value = false;
+    event.preventDefault();
+    input.value
+        ?.querySelector<HTMLButtonElement>('[data-date-field="' + activeField.value + '"]')
+        ?.focus();
 }
 
 function selectDate(value: DateValue | undefined) {
@@ -93,6 +111,7 @@ function clearDraft() {
 
 function apply() {
     if (error.value) return;
+    restoreInputFocus.value = true;
     dates.value = { ...draft.value };
     open.value = false;
 }
@@ -100,56 +119,55 @@ function apply() {
 
 <template>
     <Field>
-        <FieldLabel :for="id">{{ t('Task dates') }}</FieldLabel>
-        <Popover :open="open" @update:open="updateOpen">
-            <PopoverTrigger as-child>
-                <Button :id="id" type="button" variant="input" class="w-full justify-between">
-                    <span class="flex min-w-0 items-center gap-2">
-                        <CalendarIcon class="size-4 shrink-0 text-icon-default" />
-                        <span
-                            class="truncate tabular-nums"
-                            :class="{ 'text-text-tertiary': !dates.start_date && !dates.due_date }">
-                            {{ summary }}
-                        </span>
-                    </span>
-                    <ChevronDown class="size-4 shrink-0 text-icon-default" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" class="w-72 max-w-[calc(100vw-2rem)] p-0">
+        <FieldLabel :id="id + '-label'" :for="id + '-start_date'">{{ t('Task dates') }}</FieldLabel>
+        <Popover v-model:open="open">
+            <PopoverAnchor as-child>
+                <div
+                    ref="input"
+                    role="group"
+                    :aria-labelledby="id + '-label'"
+                    class="date-input flex min-h-9 min-w-0 items-center rounded-md border border-input-border bg-input-background px-2 shadow-sm">
+                    <CalendarIcon
+                        aria-hidden="true"
+                        class="mr-1 size-4 shrink-0 text-icon-default" />
+                    <template v-for="field in fields" :key="field.name">
+                        <ArrowRight
+                            v-if="field.name === 'due_date'"
+                            aria-hidden="true"
+                            class="mx-1 size-3 shrink-0 text-icon-default" />
+                        <button
+                            :id="id + '-' + field.name"
+                            type="button"
+                            :data-date-field="field.name"
+                            :data-active="open && activeField === field.name ? '' : undefined"
+                            :aria-expanded="open && activeField === field.name"
+                            :aria-controls="open ? panelId : undefined"
+                            :aria-label="t(field.label) + ' · ' + endpointLabel(field.name)"
+                            aria-haspopup="dialog"
+                            class="date-input-segment flex min-w-0 flex-1 items-center gap-1.5 rounded px-1.5 py-1 text-left text-sm tabular-nums text-text-primary hover:bg-tertiary focus-visible:outline-2 focus-visible:outline-ring"
+                            :class="field.marker"
+                            @click="editField(field.name)">
+                            <span aria-hidden="true" class="endpoint-key" />
+                            <span
+                                class="truncate"
+                                :class="{ 'text-text-secondary': !displayed[field.name] }">
+                                {{ endpointLabel(field.name) }}
+                            </span>
+                        </button>
+                    </template>
+                </div>
+            </PopoverAnchor>
+            <PopoverContent
+                :id="panelId"
+                :aria-label="t('Task dates')"
+                align="start"
+                class="w-72 max-w-[calc(100vw-2rem)] p-0"
+                @interact-outside="keepOpenOnInput"
+                @escape-key-down="restoreInputFocus = true"
+                @close-auto-focus="restoreDateFieldFocus">
                 <div class="task-date-picker">
                     <span :id="startDescriptionId" class="sr-only">{{ t('Start date') }}</span>
                     <span :id="dueDescriptionId" class="sr-only">{{ t('Due date') }}</span>
-                    <div
-                        role="group"
-                        :aria-label="t('Task dates')"
-                        class="grid grid-cols-2 gap-2 border-b border-border p-3">
-                        <button
-                            v-for="field in fields"
-                            :key="field.name"
-                            type="button"
-                            :aria-pressed="activeField === field.name"
-                            class="flex min-w-0 flex-col gap-0.5 rounded-md border border-border px-2.5 py-1.5 text-left hover:bg-tertiary focus-visible:outline-2 focus-visible:outline-ring aria-pressed:border-accent-500 aria-pressed:bg-accent-500/5"
-                            @click="editField(field.name)">
-                            <span
-                                class="flex items-center gap-1.5 text-xs font-medium text-text-secondary">
-                                <span
-                                    aria-hidden="true"
-                                    class="endpoint-key"
-                                    :class="field.marker" />
-                                {{ t(field.label) }}
-                            </span>
-                            <span
-                                class="max-w-full truncate text-sm tabular-nums text-text-primary">
-                                {{
-                                    draft[field.name]
-                                        ? format(draft[field.name]!)
-                                        : field.name === 'due_date' && draft.start_date
-                                          ? t('Ongoing')
-                                          : t('Pick a date')
-                                }}
-                            </span>
-                        </button>
-                    </div>
                     <Calendar
                         v-model:placeholder="visibleDate"
                         :model-value="null"
@@ -206,6 +224,7 @@ function apply() {
 </template>
 
 <style scoped>
+.date-input,
 .task-date-picker {
     --task-start-color: #1681b2;
     --task-due-color: #835ba9;
@@ -214,14 +233,18 @@ function apply() {
     width: 0.55rem;
     height: 0.55rem;
     flex: none;
-    border: 1.5px solid;
+    border: 1.5px solid var(--endpoint-color);
     border-radius: 2px;
 }
 .start-marker {
-    color: var(--task-start-color);
+    --endpoint-color: var(--task-start-color);
 }
 .due-marker {
-    color: var(--task-due-color);
+    --endpoint-color: var(--task-due-color);
+}
+.date-input-segment[data-active] {
+    background: color-mix(in oklch, var(--endpoint-color) 9%, transparent);
+    box-shadow: inset 0 -1.5px var(--endpoint-color);
 }
 .task-date-picker :deep(.task-date-day:is([data-task-start], [data-task-due])) {
     position: relative;
