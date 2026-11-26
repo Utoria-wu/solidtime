@@ -28,6 +28,7 @@ import NavigationSidebarItem from '@/Components/NavigationSidebarItem.vue';
 import MainContainer from '@/packages/ui/src/MainContainer.vue';
 import { computed, nextTick, onMounted, provide, ref } from 'vue';
 import NotificationContainer from '@/Components/NotificationContainer.vue';
+import PersonalReminderAlerts from '@/Components/Calendar/PersonalReminderAlerts.vue';
 import { initializeStores } from '@/utils/init';
 import { useCurrentTimeEntryStore } from '@/utils/useCurrentTimeEntry';
 import {
@@ -397,6 +398,7 @@ const { t } = useInterfaceLanguage();
         </div>
     </div>
     <NotificationContainer></NotificationContainer>
+    <PersonalReminderAlerts />
     <UserTimezoneMismatchModal></UserTimezoneMismatchModal>
     <CommandPaletteProvider></CommandPaletteProvider>
     <UpgradeModal v-model:show="showBillableRatesUpgradeModal" feature="billable-rates" />

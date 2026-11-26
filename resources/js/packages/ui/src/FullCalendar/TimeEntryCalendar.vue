@@ -41,6 +41,7 @@ import type { ActivityPeriod } from './activityTypes';
 import { SLOT_HEIGHT, TIME_AXIS_WIDTH, type DayEvent } from './calendarTypes';
 import { useCalendarGrid } from './useCalendarGrid';
 import { useCalendarNavigation } from './useCalendarNavigation';
+import type { CalendarView } from './useCalendarNavigation';
 import { useCalendarEvents } from './useCalendarEvents';
 import { useActivityBoxes } from './useActivityBoxes';
 import { useEventDrag } from './useEventDrag';
@@ -60,7 +61,7 @@ import type {
 import type { Dayjs } from 'dayjs';
 
 const emit = defineEmits<{
-    (e: 'dates-change', payload: { start: Dayjs; end: Dayjs }): void;
+    (e: 'dates-change', payload: { start: Dayjs; end: Dayjs; view: CalendarView }): void;
     (e: 'refresh'): void;
 }>();
 
@@ -80,6 +81,7 @@ const props = defineProps<{
     // Local date (YYYY-MM-DD) to open the calendar on, e.g. from a "Fix in calendar" deep link
     initialDate?: string | null;
     initialEntryId?: string | null;
+    initialView?: CalendarView;
 
     createTimeEntry: (
         entry: Omit<TimeEntry, 'id' | 'organization_id' | 'user_id'>
@@ -149,6 +151,8 @@ const {
 
 const {
     activeView,
+    currentDate,
+    isOverview,
     viewDays,
     rangeLabel,
     emitDatesChange,
@@ -163,6 +167,7 @@ const {
     // treat the bare date as UTC midnight, landing on the previous local day
     // for negative UTC offsets
     initialDate: props.initialDate ? getLocalizedDayJsFromMinutes(props.initialDate, 0) : null,
+    initialView: props.initialView,
 });
 
 const cssBackground = useCssVariable('--color-bg-background');
@@ -477,13 +482,6 @@ function getEventDurationSeconds(dayEvent: DayEvent, dayStr: string): number {
 
 <template>
     <div class="w-full relative h-full flex-1 flex flex-col overflow-hidden min-h-0">
-        <div v-if="loading" class="flex items-center justify-center h-full">
-            <div class="flex flex-col items-center space-y-4">
-                <LoadingSpinner class="h-8 w-8" />
-                <p class="text-muted-foreground">Loading calendar data...</p>
-            </div>
-        </div>
-
         <TimeEntryCreateModal
             v-model:show="showCreateTimeEntryModal"
             :enable-estimated-time="enableEstimatedTime"
@@ -524,17 +522,28 @@ function getEventDurationSeconds(dayEvent: DayEvent, dayStr: string): number {
             :can-create-project="canCreateProject"
             :organization-billable-rate="organizationBillableRate" />
 
-        <template v-if="!loading">
-            <CalendarToolbar
-                :range-label="rangeLabel"
-                :active-view="activeView"
-                :settings="calendarSettings"
-                @prev="handlePrev"
-                @next="handleNext"
-                @today="handleToday"
-                @change-view="handleChangeView"
-                @update:settings="onSettingsUpdate" />
+        <CalendarToolbar
+            :range-label="rangeLabel"
+            :active-view="activeView"
+            :settings="calendarSettings"
+            @prev="handlePrev"
+            @next="handleNext"
+            @today="handleToday"
+            @change-view="handleChangeView"
+            @update:settings="onSettingsUpdate">
+            <slot name="actions" :date="currentDate" />
+        </CalendarToolbar>
 
+        <slot
+            v-if="isOverview"
+            name="overview"
+            :view="activeView"
+            :date="currentDate"
+            :navigate="handleChangeView" />
+        <div v-else-if="loading" class="flex flex-1 items-center justify-center">
+            <LoadingSpinner class="h-8 w-8" aria-label="Loading calendar data" />
+        </div>
+        <template v-else>
             <ContextMenu v-model:open="contextMenuOpen">
                 <ContextMenuTrigger
                     as="div"
@@ -572,6 +581,7 @@ function getEventDurationSeconds(dayEvent: DayEvent, dayStr: string): number {
                                         :break-seconds="
                                             dailyBreakTotals[day.format('YYYY-MM-DD')] || 0
                                         " />
+                                    <slot name="day-items" :date="day" />
                                 </div>
                             </div>
                         </div>

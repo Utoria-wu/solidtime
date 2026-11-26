@@ -97,7 +97,8 @@ export async function fetchAllCalendarEntries(
 
 export function useTimeEntriesCalendarQuery(
     calendarStart: Ref<Dayjs | undefined>,
-    calendarEnd: Ref<Dayjs | undefined>
+    calendarEnd: Ref<Dayjs | undefined>,
+    prefetchNeighbors: Ref<boolean>
 ) {
     const enableCalendarQuery = computed(() => {
         return !!getCurrentOrganizationId() && !!calendarStart.value && !!calendarEnd.value;
@@ -107,7 +108,12 @@ export function useTimeEntriesCalendarQuery(
         if (!calendarStart.value || !calendarEnd.value) {
             return { start: null, end: null };
         }
-        return getExpandedCalendarDateRange(calendarStart.value, calendarEnd.value);
+        return prefetchNeighbors.value
+            ? getExpandedCalendarDateRange(calendarStart.value, calendarEnd.value)
+            : {
+                  start: localDateToUtc(calendarStart.value),
+                  end: localDateToUtc(calendarEnd.value),
+              };
     });
 
     return useQuery<TimeEntryResponse>({

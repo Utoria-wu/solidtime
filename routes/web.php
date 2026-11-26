@@ -7,6 +7,7 @@ use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\OrganizationController;
 use App\Http\Controllers\Web\OrganizationInvitationController;
 use App\Http\Controllers\Web\OtherBrowserSessionsController;
+use App\Http\Controllers\Web\PersonalCalendarController;
 use App\Http\Controllers\Web\UserController;
 use App\Http\Controllers\Web\UserProfileController;
 use App\Service\PermissionStore;
@@ -45,6 +46,15 @@ Route::middleware([
     Route::get('/calendar', function () {
         return Inertia::render('Calendar');
     })->name('calendar');
+    Route::prefix('personal-calendar')->group(function (): void {
+        Route::get('/', [PersonalCalendarController::class, 'index']);
+        Route::get('/alerts', [PersonalCalendarController::class, 'alerts']);
+        Route::post('/holidays/import', [PersonalCalendarController::class, 'import']);
+        Route::post('/reminders', [PersonalCalendarController::class, 'store']);
+        Route::put('/reminders/{reminder}', [PersonalCalendarController::class, 'update'])->whereUuid('reminder');
+        Route::delete('/reminders/{reminder}', [PersonalCalendarController::class, 'destroy'])->whereUuid('reminder');
+        Route::post('/reminders/{reminder}/dismiss', [PersonalCalendarController::class, 'dismiss'])->whereUuid('reminder');
+    });
 
     Route::get('/timesheet', function () {
         return Inertia::render('Timesheet');

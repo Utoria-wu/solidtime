@@ -3,7 +3,9 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import { useTimeEntriesCalendarQuery } from '@/utils/useTimeEntriesCalendarQuery';
 import { useTimeEntriesMutations } from '@/utils/useTimeEntriesMutations';
 import { computed, ref, onMounted } from 'vue';
-import { useEventListener } from '@vueuse/core';
+import { useEventListener, useLocalStorage } from '@vueuse/core';
+import { router } from '@inertiajs/vue3';
+import { Bell, ChevronDown, Plus, Upload } from '@lucide/vue';
 import axios from 'axios';
 import type { Dayjs } from 'dayjs';
 import { useQueryClient } from '@tanstack/vue-query';
@@ -15,6 +17,21 @@ import {
     type TimeEntry,
 } from '@/packages/api/src';
 import { TimeEntryCalendar } from '@/packages/ui/src';
+import { Button } from '@/packages/ui/src/Buttons';
+import { getDayJsInstance, getLocalizedDayJs } from '@/packages/ui/src/utils/time';
+import type { CalendarView } from '@/packages/ui/src/FullCalendar/useCalendarNavigation';
+import CalendarOverview, {
+    type CalendarOverviewItem,
+} from '@/Components/Calendar/CalendarOverview.vue';
+import ReminderDialog from '@/Components/Calendar/ReminderDialog.vue';
+import {
+    personalCalendarChanged,
+    personalCalendarError,
+    personalCalendarUrl,
+    usePersonalCalendar,
+    type Reminder,
+    type ReminderFields,
+} from '@/Components/Calendar/personalCalendar';
 import type { ActivityPeriod } from '@/packages/ui/src/FullCalendar/activityTypes';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { useTagsStore } from '@/utils/useTags';
@@ -28,17 +45,30 @@ import { getOrganizationCurrencyString } from '@/utils/money';
 import { canCreateProjects } from '@/utils/permissions';
 import { useCurrentTimeEntryStore } from '@/utils/useCurrentTimeEntry';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
-import { getCurrentOrganizationId } from '@/utils/useUser';
+import { getCurrentOrganizationId, getCurrentUserId } from '@/utils/useUser';
 import { useNotificationsStore } from '@/utils/notification';
 
 const { organization } = useOrganizationQuery(getCurrentOrganizationId()!);
 const calendarStart = ref<Dayjs | undefined>(undefined);
 const calendarEnd = ref<Dayjs | undefined>(undefined);
+const calendarView = ref<CalendarView>('timeGridWeek');
+const calendarDateKey = (day: Dayjs) => day.format('YYYY-MM-DD');
+const startKey = computed(() => (calendarStart.value ? calendarDateKey(calendarStart.value) : ''));
+const endKey = computed(() => (calendarEnd.value ? calendarDateKey(calendarEnd.value) : ''));
+const prefetchNeighbors = computed(
+    () => calendarView.value === 'timeGridDay' || calendarView.value === 'timeGridWeek'
+);
 
 // Optional deep link (e.g. "Fix in calendar") that opens the calendar on a specific day
 const calendarLink = new URLSearchParams(window.location.search);
 const initialDate = calendarLink.get('date');
 const initialEntryId = calendarLink.get('entry');
+const viewParam = calendarLink.get('view');
+const initialView: CalendarView = initialEntryId
+    ? 'timeGridDay'
+    : viewParam === 'month' || viewParam === 'year'
+      ? viewParam
+      : 'timeGridWeek';
 
 // Test-injectable activity periods (for E2E testing).
 // These hooks are no-ops in production — they only take effect when test code
@@ -60,10 +90,11 @@ onMounted(() => {
     }
 });
 
-const { data: timeEntryResponse, isLoading: timeEntriesLoading } = useTimeEntriesCalendarQuery(
-    calendarStart,
-    calendarEnd
-);
+const {
+    data: timeEntryResponse,
+    isLoading: timeEntriesLoading,
+    isError: timeEntriesError,
+} = useTimeEntriesCalendarQuery(calendarStart, calendarEnd, prefetchNeighbors);
 
 const currentTimeEntries = computed(() => {
     return timeEntryResponse?.value?.data || [];
@@ -71,6 +102,149 @@ const currentTimeEntries = computed(() => {
 const undoAction = ref<{ label: string; run: () => Promise<unknown> }>();
 const undoing = ref(false);
 const notifications = useNotificationsStore();
+const queryClient = useQueryClient();
+const {
+    data: personalCalendar,
+    isLoading: personalLoading,
+    isError: personalError,
+} = usePersonalCalendar(startKey, endKey);
+const sources = useLocalStorage(
+    `solidtime:calendar-sources:${getCurrentUserId()}`,
+    {
+        entries: true,
+        reminders: true,
+        holidays: true,
+    },
+    { mergeDefaults: true }
+);
+const dayjs = getDayJsInstance();
+const calendarItems = computed(() => {
+    const days = new Map<string, CalendarOverviewItem[]>();
+    if (!startKey.value || !endKey.value) return days;
+
+    function add(item: CalendarOverviewItem) {
+        let day = dayjs.utc(item.start < startKey.value ? startKey.value : item.start);
+        const limit = item.end < endKey.value ? item.end : endKey.value;
+        for (let key = calendarDateKey(day); key < limit; key = calendarDateKey(day)) {
+            const records = days.get(key);
+            if (records) records.push(item);
+            else days.set(key, [item]);
+            day = day.add(1, 'day');
+        }
+    }
+
+    if (sources.value.holidays) {
+        for (const holiday of personalCalendar.value?.holidays ?? []) {
+            add({
+                key: `holiday-${holiday.id}`,
+                kind: holiday.workday ? 'workday' : 'holiday',
+                title: holiday.title,
+                start: holiday.start_date,
+                end: holiday.end_date,
+            });
+        }
+    }
+    if (sources.value.reminders) {
+        for (const reminder of personalCalendar.value?.reminders ?? []) {
+            add({
+                key: reminder.id,
+                kind: 'reminder',
+                title: reminder.title,
+                reminder,
+                time: reminder.time,
+                start: reminder.date,
+                end: calendarDateKey(dayjs.utc(reminder.date).add(1, 'day')),
+            });
+        }
+    }
+    if (sources.value.entries && !prefetchNeighbors.value) {
+        for (const entry of currentTimeEntries.value) {
+            const start = getLocalizedDayJs(entry.start);
+            const end = entry.end ? getLocalizedDayJs(entry.end) : getLocalizedDayJs();
+            const last = end.isAfter(start) ? end.subtract(1, 'millisecond') : start;
+            add({
+                key: entry.id,
+                kind: 'entry',
+                title: entry.description || 'Untitled time entry',
+                start: calendarDateKey(start),
+                end: calendarDateKey(last.add(1, 'day')),
+                entryId: entry.end ? entry.id : undefined,
+                time: start.format('HH:mm'),
+            });
+        }
+    }
+    return days;
+});
+
+const reminderOpen = ref(false);
+const editingReminder = ref<Reminder | null>(null);
+const reminderDate = ref('');
+const reminderBusy = ref(false);
+const reminderError = ref('');
+const sourceMenu = ref<HTMLDetailsElement | null>(null);
+const importInput = ref<HTMLInputElement | null>(null);
+const importing = ref(false);
+
+function openReminder(date: Dayjs, reminder: Reminder | null = null) {
+    editingReminder.value = reminder;
+    reminderDate.value = calendarDateKey(date);
+    reminderError.value = '';
+    reminderOpen.value = true;
+}
+
+function refreshPersonalCalendar() {
+    window.dispatchEvent(new Event(personalCalendarChanged));
+    return queryClient.invalidateQueries({ queryKey: ['personalCalendar', getCurrentUserId()] });
+}
+
+async function changeReminder(fields?: ReminderFields) {
+    if (reminderBusy.value) return;
+    reminderBusy.value = true;
+    reminderError.value = '';
+    const id = editingReminder.value?.id;
+    const url = personalCalendarUrl + '/reminders' + (id ? `/${id}` : '');
+    try {
+        if (fields && id) await axios.put(url, fields);
+        else if (fields) await axios.post(url, fields);
+        else if (id) await axios.delete(url);
+        reminderOpen.value = false;
+        if (fields) sources.value.reminders = true;
+        await refreshPersonalCalendar();
+        notifications.addNotification('success', fields ? 'Reminder saved' : 'Reminder deleted');
+    } catch (error) {
+        reminderError.value = personalCalendarError(error);
+    } finally {
+        reminderBusy.value = false;
+    }
+}
+
+async function importHolidays(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || importing.value) return;
+    importing.value = true;
+    try {
+        const upload = new FormData();
+        upload.append('calendar', file);
+        const { data } = await axios.post<{ imported: number; skipped: number }>(
+            personalCalendarUrl + '/holidays/import',
+            upload
+        );
+        sources.value.holidays = true;
+        if (sourceMenu.value) sourceMenu.value.open = false;
+        await refreshPersonalCalendar();
+        notifications.addNotification(
+            'success',
+            `Imported ${data.imported} holiday entries`,
+            data.skipped ? `Skipped ${data.skipped} unsupported entries.` : undefined
+        );
+    } catch (error) {
+        notifications.addNotification('error', personalCalendarError(error));
+    } finally {
+        importing.value = false;
+    }
+}
 
 function entryUrl(id: string) {
     return `/api/v1/organizations/${getCurrentOrganizationId()}/time-entries/${id}`;
@@ -180,11 +354,10 @@ const { tasks } = useTasksQuery();
 const { clients } = useClientsQuery();
 const { tags } = useTagsQuery();
 
-const queryClient = useQueryClient();
-
-function onDatesChange({ start, end }: { start: Dayjs; end: Dayjs }) {
+function onDatesChange({ start, end, view }: { start: Dayjs; end: Dayjs; view: CalendarView }) {
     calendarStart.value = start;
     calendarEnd.value = end;
+    calendarView.value = view;
 }
 
 function onRefresh() {
@@ -200,6 +373,25 @@ function onRefresh() {
         title="Calendar"
         data-testid="calendar_view"
         main-class="p-0 min-h-0 overflow-hidden">
+        <p
+            v-if="personalError || timeEntriesError"
+            role="alert"
+            class="border-b border-border px-6 py-2 text-sm text-destructive">
+            {{
+                personalError
+                    ? 'Personal reminders and holidays could not be loaded.'
+                    : 'Time entries could not be loaded.'
+            }}
+        </p>
+        <ReminderDialog
+            :show="reminderOpen"
+            :date="reminderDate"
+            :reminder="editingReminder"
+            :busy="reminderBusy"
+            :error="reminderError"
+            @close="reminderOpen = false"
+            @save="changeReminder"
+            @remove="changeReminder()" />
         <div
             v-if="undoAction"
             class="fixed bottom-5 right-5 z-40 flex items-center gap-4 rounded-lg border border-border bg-card-background px-4 py-2 text-sm shadow-md">
@@ -221,7 +413,7 @@ function onRefresh() {
             </button>
         </div>
         <TimeEntryCalendar
-            :time-entries="currentTimeEntries"
+            :time-entries="sources.entries || initialEntryId ? currentTimeEntries : []"
             :projects="projects"
             :tasks="tasks"
             :clients="clients"
@@ -232,6 +424,7 @@ function onRefresh() {
             :can-create-project="canCreateProjects()"
             :initial-date="initialDate"
             :initial-entry-id="initialEntryId"
+            :initial-view="initialView"
             :organization-billable-rate="organization?.billable_rate ?? null"
             :create-time-entry="createTimeEntry"
             :update-time-entry="updateTimeEntry"
@@ -241,6 +434,102 @@ function onRefresh() {
             :create-tag="createTag"
             :activity-periods="testActivityPeriods"
             @dates-change="onDatesChange"
-            @refresh="onRefresh" />
+            @refresh="onRefresh">
+            <template #actions="{ date }">
+                <details
+                    ref="sourceMenu"
+                    class="relative"
+                    @keydown.esc="sourceMenu && (sourceMenu.open = false)">
+                    <summary
+                        class="flex h-8 cursor-pointer list-none items-center gap-1.5 rounded-md border border-input bg-card-background px-2.5 text-xs font-medium hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+                        Calendars <ChevronDown class="size-3.5" aria-hidden="true" />
+                    </summary>
+                    <div
+                        class="absolute left-0 top-full z-30 mt-1 min-w-44 rounded-md border border-border bg-card-background p-2 text-sm shadow-md sm:left-auto sm:right-0">
+                        <label class="flex items-center gap-2 rounded px-2 py-1.5">
+                            <input v-model="sources.entries" type="checkbox" class="rounded" /> Time
+                            entries
+                        </label>
+                        <label class="flex items-center gap-2 rounded px-2 py-1.5">
+                            <input v-model="sources.reminders" type="checkbox" class="rounded" />
+                            Personal reminders
+                        </label>
+                        <label class="flex items-center gap-2 rounded px-2 py-1.5">
+                            <input v-model="sources.holidays" type="checkbox" class="rounded" />
+                            Chinese holidays
+                        </label>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            class="mt-1 w-full justify-start"
+                            :disabled="importing"
+                            @click="importInput?.click()">
+                            <Upload /> {{ importing ? 'Importing…' : 'Import holidays (.ics)' }}
+                        </Button>
+                        <input
+                            ref="importInput"
+                            type="file"
+                            hidden
+                            accept=".ics,text/calendar"
+                            aria-label="Import holiday calendar file"
+                            @change="importHolidays" />
+                    </div>
+                </details>
+                <Button
+                    size="sm"
+                    class="bg-button-primary-background text-button-primary-text hover:bg-button-primary-background-hover"
+                    @click="openReminder(date)">
+                    <Plus /> Reminder
+                </Button>
+            </template>
+            <template #overview="{ view, date, navigate }">
+                <CalendarOverview
+                    v-if="view === 'month' || view === 'year'"
+                    :view="view"
+                    :date="date"
+                    :items="calendarItems"
+                    :loading="timeEntriesLoading || personalLoading"
+                    :show-entries="sources.entries"
+                    :show-reminders="sources.reminders"
+                    :show-holidays="sources.holidays"
+                    @select="(selected) => navigate('month', selected)"
+                    @month="
+                        (month) => navigate('month', month.isSame(date, 'month') ? date : month)
+                    "
+                    @entry="
+                        (id, day) =>
+                            router.get('/calendar', { date: calendarDateKey(day), entry: id })
+                    "
+                    @edit="(item) => openReminder(date, item)"
+                    @add="openReminder(date)" />
+            </template>
+            <template #day-items="{ date }">
+                <div
+                    v-if="calendarItems.get(calendarDateKey(date))?.length"
+                    class="mt-1 flex flex-wrap justify-center gap-1">
+                    <template
+                        v-for="item in calendarItems.get(calendarDateKey(date))"
+                        :key="item.key">
+                        <button
+                            v-if="item.reminder"
+                            type="button"
+                            class="flex max-w-full items-center gap-1 rounded bg-violet-500/10 px-1.5 py-0.5 text-xs hover:bg-violet-500/20"
+                            @click="openReminder(date, item.reminder)">
+                            <Bell class="size-3 shrink-0" aria-hidden="true" />
+                            <span class="truncate">{{ item.time }} {{ item.title }}</span>
+                        </button>
+                        <span
+                            v-else
+                            class="max-w-full truncate rounded px-1.5 py-0.5 text-xs"
+                            :class="
+                                item.kind === 'workday' ? 'bg-amber-500/10' : 'bg-emerald-500/10'
+                            "
+                            :title="item.title"
+                            >{{ item.title }}</span
+                        >
+                    </template>
+                </div>
+            </template>
+        </TimeEntryCalendar>
     </AppLayout>
 </template>
