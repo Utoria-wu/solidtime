@@ -1,9 +1,8 @@
-import axios, { type AxiosRequestConfig } from 'axios';
 import { computed } from 'vue';
 import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import { getCurrentOrganizationId } from '@/utils/useUser';
 import { useNotificationsStore } from '@/utils/notification';
-import { fetchToken } from '@/utils/session';
+import { requestWithSession as request } from '@/utils/requestWithSession';
 
 export type TaskCategory = {
     id: string;
@@ -39,16 +38,6 @@ export type HistoryEntry = {
 };
 export type HistoryBody = Omit<HistoryEntry, 'id' | 'author_name' | 'source'>;
 const base = () => `/api/v1/organizations/${getCurrentOrganizationId()}`;
-
-async function request<T>(config: AxiosRequestConfig): Promise<T> {
-    try {
-        return (await axios.request<T>(config)).data;
-    } catch (error) {
-        if (!axios.isAxiosError(error) || error.response?.status !== 401) throw error;
-        await fetchToken();
-        return (await axios.request<T>(config)).data;
-    }
-}
 
 export function useTaskCategories() {
     const client = useQueryClient();

@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\TagController;
 use App\Http\Controllers\Api\V1\TaskCategoryController;
 use App\Http\Controllers\Api\V1\TaskController;
 use App\Http\Controllers\Api\V1\TaskHistoryController;
+use App\Http\Controllers\Api\V1\TaskRelationshipController;
 use App\Http\Controllers\Api\V1\TaskTimerController;
 use App\Http\Controllers\Api\V1\TimeEntryController;
 use App\Http\Controllers\Api\V1\TimeZoneController;
@@ -188,6 +189,9 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
             Route::post('/projects/{project}/history', [TaskHistoryController::class, 'store'])->middleware('check-organization-blocked')->name('projects.history.store');
             Route::put('/projects/{project}/history/{entry}', [TaskHistoryController::class, 'update'])->middleware('check-organization-blocked')->name('projects.history.update');
             Route::delete('/projects/{project}/history/{entry}', [TaskHistoryController::class, 'destroy'])->middleware('check-organization-blocked')->name('projects.history.destroy');
+            Route::get('/projects/{project}/task-relationships', [TaskRelationshipController::class, 'index'])->name('projects.task-relationships.index');
+            Route::post('/projects/{project}/task-relationships', [TaskRelationshipController::class, 'store'])->middleware('check-organization-blocked')->name('projects.task-relationships.store');
+            Route::delete('/projects/{project}/task-relationships/{relationship}', [TaskRelationshipController::class, 'destroy'])->middleware('check-organization-blocked')->name('projects.task-relationships.destroy');
             Route::get('/tasks', [TaskController::class, 'index'])->name('index');
             Route::post('/tasks', [TaskController::class, 'store'])->name('store')->middleware('check-organization-blocked');
             Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('update')->middleware('check-organization-blocked');

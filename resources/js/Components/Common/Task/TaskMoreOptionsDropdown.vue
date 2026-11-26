@@ -3,6 +3,7 @@ import {
     TrashIcon,
     PauseIcon,
     PencilSquareIcon,
+    LinkIcon,
     CheckCircleIcon,
     XCircleIcon,
     ArrowUturnLeftIcon,
@@ -23,6 +24,7 @@ const emit = defineEmits<{
     edit: [];
     done: [];
     cancel: [];
+    link: [];
 }>();
 const props = defineProps<{
     task: Task;
@@ -83,6 +85,13 @@ const props = defineProps<{
                 @click="emit('edit')">
                 <PencilSquareIcon class="w-5 text-icon-active" />
                 <span>Edit</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+                v-if="canUpdateTasks()"
+                class="flex cursor-pointer items-center space-x-3"
+                @click="emit('link')">
+                <LinkIcon class="w-5 text-icon-active" />
+                <span>Link task</span>
             </DropdownMenuItem>
             <DropdownMenuItem
                 v-if="canUpdateTasks() && !props.task.is_done"

@@ -21,11 +21,16 @@ import {
 import { canCreateTags, canUpdateTags, canViewAllTimeEntries } from '@/utils/permissions';
 import { getCurrentMembershipId, getCurrentOrganizationId } from '@/utils/useUser';
 import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
+import { useTaskRelationships } from '@/utils/useTaskRelationships';
 import TaskCategoryManager from './TaskCategoryManager.vue';
+import TaskRelationshipMap from './TaskRelationshipMap.vue';
 
 const props = defineProps<{ projectId: string; tasks: Task[] }>();
+const emit = defineEmits<{ openActivity: [task: Task] }>();
 const { categories, isError: categoryError } = useTaskCategories();
 const legacy = useTaskHistory(props.projectId);
+const taskLinks = useTaskRelationships(props.projectId);
+const expandedMap = ref<string | null>(null);
 const selectedTask = ref<string | null>(null);
 const groupBy = ref<'category' | 'stage'>('category');
 const collapsed = ref(new Set<string>());
@@ -153,6 +158,27 @@ const days = computed(() => {
     }
     return result;
 });
+
+const mapRecords = computed(() => {
+    const linked = new Set<string>();
+    for (const edge of taskLinks.relationships.value) {
+        if (!taskMap.value.has(edge.task_id) || !taskMap.value.has(edge.related_task_id)) continue;
+        linked.add(edge.task_id);
+        linked.add(edge.related_task_id);
+    }
+    const anchors = new Map<string, Record>();
+    const priority = (record: Record) =>
+        record.legacy?.kind === 'problem' ? 0 : record.id.startsWith('created-') ? 1 : 2;
+    for (const day of days.value.values()) {
+        for (const record of day) {
+            if (!linked.has(record.task.id)) continue;
+            const current = anchors.get(record.task.id);
+            if (!current || priority(record) < priority(current))
+                anchors.set(record.task.id, record);
+        }
+    }
+    return new Set([...anchors.values()].map((record) => record.id));
+});
 const groups = computed(() => {
     const result = new Map<string, { name: string; color: string; tasks: Task[]; order: number }>();
     for (const task of props.tasks) {
@@ -260,7 +286,7 @@ function toggle(id: string) {
 
             <section class="history-timeline min-w-0">
                 <p
-                    v-if="calendar.isError.value || legacy.isError.value"
+                    v-if="calendar.isError.value || legacy.isError.value || taskLinks.isError.value"
                     role="alert"
                     class="px-5 py-3 text-sm text-text-secondary">
                     Some history could not be loaded.
@@ -270,6 +296,7 @@ function toggle(id: string) {
                         @click="
                             calendar.refetch();
                             legacy.refetch();
+                            taskLinks.refetch();
                         ">
                         Retry
                     </button>
@@ -333,6 +360,32 @@ function toggle(id: string) {
                                         class="text-xs text-text-secondary underline"
                                         >Previous record</a
                                     >
+                                    <button
+                                        v-if="mapRecords.has(record.id)"
+                                        type="button"
+                                        class="mt-1 block text-left text-xs font-medium text-accent-400 hover:underline"
+                                        :aria-expanded="expandedMap === record.id"
+                                        :aria-controls="'task-map-' + record.id"
+                                        @click="
+                                            expandedMap =
+                                                expandedMap === record.id ? null : record.id
+                                        ">
+                                        {{
+                                            expandedMap === record.id
+                                                ? 'Hide task map'
+                                                : 'Show task map'
+                                        }}
+                                    </button>
+                                    <TaskRelationshipMap
+                                        v-if="
+                                            mapRecords.has(record.id) && expandedMap === record.id
+                                        "
+                                        :id="'task-map-' + record.id"
+                                        :task-id="record.task.id"
+                                        :tasks="tasks"
+                                        :relationships="taskLinks.relationships.value"
+                                        class="mt-2 border-t border-row-separator pt-2"
+                                        @open-activity="emit('openActivity', $event)" />
                                 </div>
                             </div>
                         </article>

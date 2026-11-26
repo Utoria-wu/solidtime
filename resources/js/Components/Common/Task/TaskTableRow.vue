@@ -33,7 +33,7 @@ import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import { Field, FieldGroup, FieldLabel } from '@/packages/ui/src/field';
 
-const emit = defineEmits<{ openActivity: []; located: [] }>();
+const emit = defineEmits<{ openActivity: []; linkTask: []; located: [] }>();
 
 const props = defineProps<{
     task: Task;
@@ -377,6 +377,7 @@ watch(
                     @done="markTaskAsDone"
                     @cancel="toggleCanceled"
                     @edit="showTaskEditModal = true"
+                    @link="emit('linkTask')"
                     @delete="deleteTask"></TaskMoreOptionsDropdown>
             </div>
         </div>

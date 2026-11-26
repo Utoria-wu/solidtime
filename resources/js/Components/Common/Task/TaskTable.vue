@@ -12,6 +12,7 @@ import TaskScheduleTrack from './TaskScheduleTrack.vue';
 import { useTimestamp } from '@vueuse/core';
 import { useTaskTimers } from '@/utils/useTaskTimers';
 import TaskActivityDialog from './TaskActivityDialog.vue';
+import TaskLinkDialog from './TaskLinkDialog.vue';
 import TaskTableRow from '@/Components/Common/Task/TaskTableRow.vue';
 import TaskTableHeading from '@/Components/Common/Task/TaskTableHeading.vue';
 import TaskCreateModal from '@/Components/Common/Task/TaskCreateModal.vue';
@@ -92,7 +93,16 @@ const createTask = ref(false);
 const locatedTaskId = ref<string | null>(null);
 const activityTaskId = ref<string | null>(null);
 const activityOpen = ref(false);
-const activityTask = computed(() => props.tasks.find((task) => task.id === activityTaskId.value));
+const activityTask = computed(() =>
+    (props.historyTasks ?? props.tasks).find((task) => task.id === activityTaskId.value)
+);
+const linkingTask = ref<Task | null>(null);
+const linkOpen = ref(false);
+
+function openLink(task: Task) {
+    linkingTask.value = task;
+    linkOpen.value = true;
+}
 function openActivity(task: Task) {
     activityTaskId.value = task.id;
     activityOpen.value = true;
@@ -205,6 +215,11 @@ function plannedDates(task: Task) {
 
 <template>
     <TaskActivityDialog v-if="activityTask" v-model:open="activityOpen" :task="activityTask" />
+    <TaskLinkDialog
+        v-if="linkOpen && linkingTask"
+        :key="linkingTask.id"
+        v-model:show="linkOpen"
+        :task="linkingTask" />
     <TaskCreateModal v-if="projectId" v-model:show="createTask" :project-id="projectId" />
     <div
         v-if="allowSchedule || scheduleProjects || allowHistory"
@@ -263,7 +278,8 @@ function plannedDates(task: Task) {
     <ProjectTaskHistory
         v-if="allowHistory && view === 'history' && projectId"
         :project-id="projectId"
-        :tasks="historyTasks ?? tasks" />
+        :tasks="historyTasks ?? tasks"
+        @open-activity="openActivity" />
     <TooltipProvider v-else :delay-duration="180">
         <div class="flow-root overflow-x-auto">
             <div class="inline-block min-w-full align-middle">
@@ -363,7 +379,8 @@ function plannedDates(task: Task) {
                             :timer-ready="ready"
                             :now="now"
                             :change="change"
-                            @open-activity="openActivity(task)">
+                            @open-activity="openActivity(task)"
+                            @link-task="openLink(task)">
                             <template v-if="showSchedule" #planned-dates>
                                 <span class="truncate text-xs font-normal text-text-secondary">
                                     {{ plannedDates(task) }}
