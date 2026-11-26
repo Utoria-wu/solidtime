@@ -1,31 +1,43 @@
 <script setup lang="ts">
 import { ChevronDownIcon } from '@heroicons/vue/20/solid';
-import { Link, usePage } from '@inertiajs/vue3';
+import { Link, router, usePage } from '@inertiajs/vue3';
 import {
     Cog6ToothIcon,
     PlusCircleIcon,
     CheckCircleIcon,
     ArrowRightIcon,
+    ArrowLeftOnRectangleIcon,
+    ChatBubbleLeftRightIcon,
 } from '@heroicons/vue/24/solid';
 import type { Organization, User } from '@/types/models';
 import { isBillingActivated } from '@/utils/billing';
 import { canManageBilling } from '@/utils/permissions';
 import { switchOrganization } from '@/utils/useOrganization';
+import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
+import { openFeedback } from '@/utils/feedback';
 import {
     DropdownMenu,
     DropdownMenuTrigger,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuLabel,
+    DropdownMenuSeparator,
 } from '@/packages/ui/src';
 
 const page = usePage<{
+    has_services_extension?: boolean;
     auth: {
         user: User & {
             all_teams: Organization[];
         };
     };
 }>();
+
+const { t } = useInterfaceLanguage();
+
+function logout() {
+    router.post(route('logout'));
+}
 
 const switchToTeam = (organization: Organization) => {
     switchOrganization(organization.id);
@@ -105,6 +117,27 @@ const switchToTeam = (organization: Organization) => {
                         </form>
                     </template>
                 </template>
+
+                <DropdownMenuSeparator />
+                <DropdownMenuItem v-if="page.props.has_services_extension" as-child>
+                    <button
+                        type="button"
+                        class="inline-flex w-full items-center gap-2.5"
+                        @click="openFeedback">
+                        <ChatBubbleLeftRightIcon class="size-5 text-icon-default" />
+                        {{ t('Feedback') }}
+                    </button>
+                </DropdownMenuItem>
+                <DropdownMenuItem as-child>
+                    <button
+                        type="button"
+                        data-testid="logout_button"
+                        class="inline-flex w-full items-center gap-2.5"
+                        @click="logout">
+                        <ArrowLeftOnRectangleIcon class="size-5 text-icon-default" />
+                        {{ t('Log Out') }}
+                    </button>
+                </DropdownMenuItem>
             </div>
         </DropdownMenuContent>
     </DropdownMenu>

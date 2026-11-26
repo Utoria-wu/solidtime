@@ -24,7 +24,7 @@ import {
 } from '@heroicons/vue/20/solid';
 import { PanelLeft, Target } from '@lucide/vue';
 import NavigationSidebarItem from '@/Components/NavigationSidebarItem.vue';
-import UserSettingsIcon from '@/Components/UserSettingsIcon.vue';
+
 import MainContainer from '@/packages/ui/src/MainContainer.vue';
 import { computed, nextTick, onMounted, provide, ref } from 'vue';
 import NotificationContainer from '@/Components/NotificationContainer.vue';
@@ -331,17 +331,14 @@ const { t } = useInterfaceLanguage();
                     <UpdateSidebarNotification></UpdateSidebarNotification>
                     <SidebarPlanStatus v-if="isBillingActivated() && canManageBilling()" />
                     <RunningSidebarTasks />
-                    <div class="space-y-0.5 border-t border-default-background-separator pt-2">
+                    <div class="space-y-0.5 border-t border-text-primary/15 pt-3">
                         <InterfaceLanguageMenu />
-                        <div class="flex items-center gap-1">
-                            <ul class="min-w-0 flex-1">
-                                <NavigationSidebarItem
-                                    :title="t('Profile Settings')"
-                                    :icon="Cog6ToothIcon"
-                                    :href="route('profile.show')" />
-                            </ul>
-                            <UserSettingsIcon />
-                        </div>
+                        <ul>
+                            <NavigationSidebarItem
+                                :title="t('Profile Settings')"
+                                :icon="Cog6ToothIcon"
+                                :href="route('profile.show')" />
+                        </ul>
                     </div>
                 </div>
             </div>
