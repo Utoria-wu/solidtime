@@ -17,6 +17,7 @@ import {
 } from '@/packages/api/src';
 import { TimeEntryCalendar } from '@/packages/ui/src';
 import { Button } from '@/packages/ui/src/Buttons';
+import Checkbox from '@/packages/ui/src/Input/Checkbox.vue';
 import { getDayJsInstance } from '@/packages/ui/src/utils/time';
 import type { CalendarView } from '@/packages/ui/src/FullCalendar/useCalendarNavigation';
 import CalendarOverview, {
@@ -116,6 +117,8 @@ const sources = useLocalStorage(
     },
     { mergeDefaults: true }
 );
+const sourceCheckboxClass =
+    'focus:ring-0 focus:ring-offset-0 focus-visible:ring-1 focus-visible:ring-ring';
 const dayjs = getDayJsInstance();
 const calendarItems = computed(() => {
     const days = new Map<string, CalendarOverviewItem[]>();
@@ -434,15 +437,21 @@ function onRefresh() {
                         <label
                             v-if="isTimeGrid"
                             class="flex items-center gap-2 rounded px-2 py-1.5">
-                            <input v-model="sources.entries" type="checkbox" class="rounded" /> Time
-                            entries
+                            <Checkbox
+                                v-model:checked="sources.entries"
+                                :class="sourceCheckboxClass" />
+                            Time entries
                         </label>
                         <label class="flex items-center gap-2 rounded px-2 py-1.5">
-                            <input v-model="sources.reminders" type="checkbox" class="rounded" />
+                            <Checkbox
+                                v-model:checked="sources.reminders"
+                                :class="sourceCheckboxClass" />
                             Personal reminders
                         </label>
                         <label class="flex items-center gap-2 rounded px-2 py-1.5">
-                            <input v-model="sources.holidays" type="checkbox" class="rounded" />
+                            <Checkbox
+                                v-model:checked="sources.holidays"
+                                :class="sourceCheckboxClass" />
                             Chinese holidays
                         </label>
                         <Button
@@ -485,7 +494,7 @@ function onRefresh() {
                         (month) => navigate('month', month.isSame(date, 'month') ? date : month)
                     "
                     @edit="(item) => openReminder(date, item)"
-                    @add="openReminder(date)" />
+                    @add="openReminder" />
             </template>
             <template #day-items="{ date }">
                 <div

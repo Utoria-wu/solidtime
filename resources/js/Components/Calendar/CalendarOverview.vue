@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 import { ChevronRight, Plus } from '@lucide/vue';
 import type { Dayjs } from 'dayjs';
 import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import { getCalendarMonthDays } from '@/packages/ui/src/FullCalendar/useCalendarNavigation';
 import { Button } from '@/packages/ui/src/Buttons';
+import { Popover, PopoverContent } from '@/packages/ui/src/popover';
 import type { Reminder } from './personalCalendar';
 
 type Kind = 'holiday' | 'workday' | 'reminder';
@@ -30,7 +31,7 @@ const props = defineProps<{
 const emit = defineEmits<{
     select: [date: Dayjs];
     month: [date: Dayjs];
-    add: [];
+    add: [date: Dayjs];
     edit: [reminder: Reminder];
 }>();
 
@@ -47,6 +48,63 @@ const dayKey = (date: Dayjs) => date.format('YYYY-MM-DD');
 const selected = computed(() => dayKey(props.date));
 const today = computed(() => dayKey(getLocalizedDayJs()));
 const agenda = computed(() => props.items.get(selected.value) ?? []);
+const focusedYearDay = ref(selected.value);
+const yearArrowOffsets: Partial<Record<string, number>> = {
+    ArrowLeft: -1,
+    ArrowRight: 1,
+    ArrowUp: -7,
+    ArrowDown: 7,
+};
+const yearPreview = shallowRef<{ date: Dayjs; anchor: HTMLElement } | null>(null);
+const yearPreviewItems = computed(() => {
+    const date = yearPreview.value?.date;
+    return date ? (props.items.get(dayKey(date)) ?? []) : [];
+});
+
+watch([() => props.view, selected], () => {
+    yearPreview.value = null;
+    focusedYearDay.value = selected.value;
+});
+
+function openYearPreview(date: Dayjs, event: MouseEvent) {
+    const anchor = event.currentTarget as HTMLElement;
+    yearPreview.value = yearPreview.value?.anchor === anchor ? null : { date, anchor };
+}
+
+function moveYearFocus(event: KeyboardEvent, date: Dayjs) {
+    const offset = yearArrowOffsets[event.key];
+    if (offset === undefined) return;
+    event.preventDefault();
+
+    const nextDate = date.add(offset, 'day');
+    if (!nextDate.isSame(date, 'year')) return;
+    const yearGrid = (event.currentTarget as HTMLElement).closest('.year-layout');
+    yearGrid?.querySelector<HTMLElement>(`[data-year-day="${dayKey(nextDate)}"]`)?.focus();
+}
+
+function closeYearPreviewAndFocus(event: KeyboardEvent) {
+    event.preventDefault();
+    const anchor = yearPreview.value?.anchor;
+    yearPreview.value = null;
+    anchor?.focus();
+}
+
+function keepPreviewWhenSwitchingDate(event: CustomEvent<{ originalEvent: Event }>) {
+    const target = event.detail.originalEvent.target;
+    if (target instanceof Element && target.closest('[data-year-day]')) event.preventDefault();
+}
+
+function addYearReminder() {
+    const preview = yearPreview.value;
+    if (!preview) return;
+    yearPreview.value = null;
+    preview.anchor.focus();
+    emit('add', preview.date);
+}
+
+function openMonthFromPreview() {
+    if (yearPreview.value) emit('select', yearPreview.value.date);
+}
 
 function makeDay(date: Dayjs, month: Dayjs) {
     const key = dayKey(date);
@@ -117,7 +175,7 @@ const yearGrid = computed(() =>
                             variant="outline"
                             class="size-8 rounded-full shadow-none"
                             aria-label="Add reminder for selected day"
-                            @click="emit('add')">
+                            @click="emit('add', date)">
                             <Plus />
                         </Button>
                     </header>
@@ -157,39 +215,106 @@ const yearGrid = computed(() =>
                 </aside>
             </div>
 
-            <div v-else class="year-layout" role="group" aria-label="Year calendar">
-                <button
-                    v-for="{ month, days } in yearGrid"
-                    :key="month.month()"
-                    type="button"
-                    class="mini-month"
-                    :class="{ 'selected-month': month.isSame(date, 'month') }"
-                    :aria-label="month.format('MMMM YYYY')"
-                    @click="emit('month', month)">
-                    <strong>{{ month.format('MMMM') }}</strong>
-                    <span class="mini-grid" aria-hidden="true">
-                        <span v-for="weekday in weekdays" :key="weekday" class="mini-weekday">{{
-                            weekday.slice(0, 1)
-                        }}</span>
-                        <span
-                            v-for="day in days"
-                            :key="day.key"
-                            class="mini-day"
-                            :data-today="(day.key === today && day.inMonth) || undefined">
-                            <template v-if="day.inMonth">
-                                <span>{{ day.date.date() }}</span>
-                                <span class="mini-marks">
-                                    <i
-                                        v-for="kind in day.kinds"
-                                        :key="kind"
-                                        class="mark"
-                                        :class="kind" />
-                                </span>
+            <Popover
+                v-else
+                :open="Boolean(yearPreview)"
+                @update:open="(open) => !open && (yearPreview = null)">
+                <div class="year-layout" role="group" aria-label="Year calendar">
+                    <section
+                        v-for="{ month, days } in yearGrid"
+                        :key="month.month()"
+                        class="mini-month">
+                        <h3>
+                            <button
+                                type="button"
+                                class="mini-month-title"
+                                :class="{ 'selected-month': month.isSame(date, 'month') }"
+                                :aria-label="month.format('MMMM YYYY')"
+                                @click="emit('month', month)">
+                                {{ month.format('MMMM') }}
+                                <ChevronRight class="size-3" aria-hidden="true" />
+                            </button>
+                        </h3>
+                        <div class="mini-grid">
+                            <span
+                                v-for="weekday in weekdays"
+                                :key="weekday"
+                                class="mini-weekday"
+                                aria-hidden="true">
+                                {{ weekday.slice(0, 1) }}
+                            </span>
+                            <template v-for="day in days" :key="day.key">
+                                <button
+                                    v-if="day.inMonth"
+                                    type="button"
+                                    class="mini-day"
+                                    :data-year-day="day.key"
+                                    :aria-label="day.date.format('dddd, MMMM D, YYYY')"
+                                    :aria-description="
+                                        day.kinds.map((kind) => labels[kind]).join(', ') ||
+                                        undefined
+                                    "
+                                    :aria-current="day.key === today ? 'date' : undefined"
+                                    :aria-expanded="
+                                        yearPreview ? day.key === dayKey(yearPreview.date) : false
+                                    "
+                                    aria-haspopup="dialog"
+                                    :tabindex="day.key === focusedYearDay ? 0 : -1"
+                                    @focus="focusedYearDay = day.key"
+                                    @keydown="moveYearFocus($event, day.date)"
+                                    @click="openYearPreview(day.date, $event)">
+                                    <span class="mini-number">{{ day.date.date() }}</span>
+                                    <span class="mini-marks" aria-hidden="true">
+                                        <i
+                                            v-for="kind in day.kinds"
+                                            :key="kind"
+                                            class="mark"
+                                            :class="kind" />
+                                    </span>
+                                </button>
+                                <span v-else aria-hidden="true" />
                             </template>
-                        </span>
-                    </span>
-                </button>
-            </div>
+                        </div>
+                    </section>
+                </div>
+                <PopoverContent
+                    v-if="yearPreview"
+                    :reference="yearPreview.anchor"
+                    :aria-label="yearPreview.date.format('dddd, MMMM D, YYYY') + ' agenda'"
+                    :side-offset="6"
+                    :collision-padding="12"
+                    :hide-when-detached="true"
+                    class="w-64 max-w-[calc(100vw-1.5rem)] border-border bg-card-background p-3 text-text-primary motion-reduce:animate-none"
+                    @interact-outside="keepPreviewWhenSwitchingDate"
+                    @escape-key-down="closeYearPreviewAndFocus"
+                    @close-auto-focus.prevent>
+                    <h2 class="preview-heading">{{ yearPreview.date.format('ddd, MMM D') }}</h2>
+                    <ul v-if="yearPreviewItems.length" class="preview-items">
+                        <li
+                            v-for="item in yearPreviewItems"
+                            :key="item.key"
+                            class="preview-item"
+                            :class="item.kind">
+                            <i class="mark" aria-hidden="true" />
+                            <span class="min-w-0 flex-1 break-words">{{ item.title }}</span>
+                            <span class="shrink-0 text-xs tabular-nums text-text-secondary">{{
+                                item.time ?? 'All day'
+                            }}</span>
+                        </li>
+                    </ul>
+                    <p v-else class="preview-empty">
+                        {{ loading ? 'Loading calendar…' : 'No items for this day' }}
+                    </p>
+                    <div class="preview-actions">
+                        <Button size="xs" variant="ghost" @click="addYearReminder"
+                            ><Plus /> Reminder</Button
+                        >
+                        <Button size="xs" variant="ghost" @click="openMonthFromPreview">
+                            Open month <ChevronRight />
+                        </Button>
+                    </div>
+                </PopoverContent>
+            </Popover>
 
             <div v-if="sources.length" class="legend" aria-label="Calendar legend">
                 <span v-for="source in sources" :key="source" :class="source">
@@ -313,14 +438,21 @@ const yearGrid = computed(() =>
     @apply grid grid-cols-4 gap-x-7 gap-y-5;
 }
 .mini-month {
-    @apply min-w-0 border-t border-default-background-separator px-2 py-3 text-left
-        transition-colors hover:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring;
+    @apply min-w-0 border-t border-default-background-separator px-2 py-3;
 }
-.mini-month strong {
-    @apply mb-3 block text-sm font-semibold;
+.mini-month-title {
+    @apply mb-2 inline-flex items-center gap-1.5 rounded px-1.5 py-1 text-sm font-semibold transition-colors hover:bg-secondary
+        focus-visible:outline focus-visible:outline-1 focus-visible:outline-ring;
 }
-.mini-month.selected-month strong {
+.mini-month-title.selected-month {
     @apply text-accent-400;
+}
+.mini-month-title svg {
+    @apply text-icon-default opacity-0 transition-opacity;
+}
+.mini-month-title:hover svg,
+.mini-month-title:focus-visible svg {
+    @apply opacity-100;
 }
 .mini-grid {
     @apply grid grid-cols-7 text-center text-xs tabular-nums;
@@ -329,16 +461,40 @@ const yearGrid = computed(() =>
     @apply mb-1 text-[10px] text-text-secondary;
 }
 .mini-day {
-    @apply relative grid min-h-6 place-items-center pb-1;
+    @apply relative grid min-h-7 place-items-center rounded pb-1 focus-visible:outline focus-visible:outline-1 focus-visible:outline-ring;
 }
-.mini-day[data-today] {
-    @apply font-semibold text-accent-400;
+.mini-number {
+    @apply grid size-6 place-items-center rounded-full transition-colors motion-reduce:transition-none;
+}
+.mini-day[aria-current='date'] .mini-number {
+    @apply font-semibold text-accent-400 ring-1 ring-inset ring-accent-400;
+}
+.mini-day:hover .mini-number {
+    @apply bg-secondary;
+}
+.mini-day[aria-expanded='true'] .mini-number {
+    @apply bg-button-primary-background text-button-primary-text ring-0;
 }
 .mini-marks {
     @apply absolute inset-x-0 bottom-0.5 flex h-1 items-center justify-center gap-0.5;
 }
 .mini-marks .mark {
     @apply size-1;
+}
+.preview-heading {
+    @apply px-1 pb-2 text-sm font-semibold;
+}
+.preview-items {
+    @apply max-h-44 overflow-auto border-t border-default-background-separator;
+}
+.preview-item {
+    @apply flex items-center gap-2 px-1 py-2 text-sm;
+}
+.preview-empty {
+    @apply border-t border-default-background-separator px-1 py-3 text-sm text-text-secondary;
+}
+.preview-actions {
+    @apply flex flex-wrap items-center justify-between gap-1 border-t border-default-background-separator pt-2;
 }
 .legend {
     @apply mt-5 flex flex-wrap gap-x-5 gap-y-2 text-xs text-text-secondary;
