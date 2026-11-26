@@ -1,14 +1,3 @@
-<script lang="ts">
-export type TaskDates = { start_date: string | null; due_date: string | null };
-
-export function getTaskDateError({ start_date: start, due_date: due }: TaskDates) {
-    if (!due) return null;
-    if (!start) return 'Choose a start date before saving a due date.';
-    if (due < start) return 'Due date must be on or after the start date.';
-    return null;
-}
-</script>
-
 <script setup lang="ts">
 import { computed, inject, ref, useId, type ComputedRef } from 'vue';
 import { parseDate, type DateValue } from '@internationalized/date';
@@ -21,120 +10,154 @@ import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
 import { firstDayIndex, formatDate, type WeekStartDay } from '@/packages/ui/src/utils/time';
 import type { Organization } from '@/packages/api/src';
 
-type DateField = keyof TaskDates;
-
+type TaskDates = { start_date: string | null; due_date: string | null };
 const dates = defineModel<TaskDates>({ required: true });
 const fields = [
     { name: 'start_date', label: 'Start date' },
     { name: 'due_date', label: 'Due date' },
 ] as const;
+
 const id = useId();
-const errorId = id + '-error';
-const openField = ref<DateField | null>(null);
+const open = ref(false);
+const activeField = ref<keyof TaskDates>('start_date');
+const draft = ref<TaskDates>({ start_date: null, due_date: null });
 const { t } = useInterfaceLanguage();
 const organization = inject<ComputedRef<Organization>>('organization');
 const weekStartsOn = computed(() => firstDayIndex.value as WeekStartDay);
-const error = computed(() => getTaskDateError(dates.value));
-const calendarDates = computed(() => {
+const format = (date: string) => formatDate(date, organization?.value.date_format);
+
+const summary = computed(() => {
     const { start_date: start, due_date: due } = dates.value;
-    return {
-        start_date: start ? parseDate(start) : undefined,
-        due_date: due ? parseDate(due) : undefined,
-    };
+    if (!start) return due ? format(due) : t('No dates set');
+    if (!due) return format(start) + ' · ' + t('Ongoing');
+    return start === due ? format(start) : format(start) + ' – ' + format(due);
 });
 
-function setPickerOpen(field: DateField, open: boolean) {
-    if (open) openField.value = field;
-    else if (openField.value === field) openField.value = null;
+const selectedDate = computed(() => {
+    const date = draft.value[activeField.value];
+    return date ? parseDate(date) : undefined;
+});
+
+const calendarAnchor = computed(() => {
+    const date = draft.value[activeField.value] ?? draft.value.start_date ?? draft.value.due_date;
+    return date ? parseDate(date) : undefined;
+});
+
+const error = computed(() => {
+    const { start_date: start, due_date: due } = draft.value;
+    if (!due) return null;
+    if (!start) return 'Choose a start date before saving a due date.';
+    if (due < start) return 'Due date must be on or after the start date.';
+    return null;
+});
+
+function updateOpen(value: boolean) {
+    if (value) {
+        draft.value = { ...dates.value };
+        activeField.value = 'start_date';
+    }
+    open.value = value;
 }
 
-function selectDate(field: DateField, value: DateValue | undefined) {
-    if (value) dates.value = { ...dates.value, [field]: value.toString() };
-    openField.value = null;
+function selectDate(value: DateValue | undefined) {
+    if (value) draft.value[activeField.value] = value.toString();
 }
 
-function clearDates() {
-    dates.value = { start_date: null, due_date: null };
-    openField.value = null;
+function clearDraft() {
+    draft.value = { start_date: null, due_date: null };
+    activeField.value = 'start_date';
 }
 
-function setOngoing() {
-    dates.value = { ...dates.value, due_date: null };
-    openField.value = null;
+function apply() {
+    if (error.value) return;
+    dates.value = { ...draft.value };
+    open.value = false;
 }
 </script>
 
 <template>
-    <div class="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2">
-        <Field v-for="field in fields" :key="field.name" class="min-w-0">
-            <FieldLabel :for="id + field.name">{{ t(field.label) }}</FieldLabel>
-            <Popover
-                :open="openField === field.name"
-                @update:open="setPickerOpen(field.name, $event)">
-                <PopoverTrigger as-child>
-                    <Button
-                        :id="id + field.name"
-                        type="button"
-                        variant="input"
-                        class="w-full justify-between gap-1"
-                        :aria-invalid="
-                            Boolean(error) && field.name === 'due_date' ? true : undefined
-                        "
-                        :aria-describedby="
-                            error && field.name === 'due_date' ? errorId : undefined
-                        ">
-                        <span class="flex min-w-0 items-center gap-1.5">
-                            <CalendarIcon class="size-4 shrink-0 text-icon-default" />
-                            <span
-                                class="truncate tabular-nums"
-                                :class="{ 'text-text-tertiary': !dates[field.name] }">
-                                {{
-                                    dates[field.name]
-                                        ? formatDate(dates[field.name]!, organization?.date_format)
-                                        : field.name === 'due_date' && dates.start_date
-                                          ? t('Ongoing')
-                                          : t('Pick a date')
-                                }}
-                            </span>
+    <Field>
+        <FieldLabel :for="id">{{ t('Task dates') }}</FieldLabel>
+        <Popover :open="open" @update:open="updateOpen">
+            <PopoverTrigger as-child>
+                <Button :id="id" type="button" variant="input" class="w-full justify-between">
+                    <span class="flex min-w-0 items-center gap-2">
+                        <CalendarIcon class="size-4 shrink-0 text-icon-default" />
+                        <span
+                            class="truncate tabular-nums"
+                            :class="{ 'text-text-tertiary': !dates.start_date && !dates.due_date }">
+                            {{ summary }}
                         </span>
-                        <ChevronDown class="size-4 shrink-0 text-icon-default" />
+                    </span>
+                    <ChevronDown class="size-4 shrink-0 text-icon-default" />
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" class="w-72 max-w-[calc(100vw-2rem)] p-0">
+                <div
+                    role="group"
+                    :aria-label="t('Task dates')"
+                    class="grid grid-cols-2 gap-2 border-b border-border p-3">
+                    <button
+                        v-for="field in fields"
+                        :key="field.name"
+                        type="button"
+                        :aria-pressed="activeField === field.name"
+                        class="flex min-w-0 flex-col gap-0.5 rounded-md border border-border px-2.5 py-1.5 text-left hover:bg-tertiary focus-visible:outline-2 focus-visible:outline-ring aria-pressed:border-accent-500 aria-pressed:bg-accent-500/5"
+                        @click="activeField = field.name">
+                        <span class="text-xs font-medium text-text-secondary">{{
+                            t(field.label)
+                        }}</span>
+                        <span class="max-w-full truncate text-sm tabular-nums text-text-primary">
+                            {{
+                                draft[field.name]
+                                    ? format(draft[field.name]!)
+                                    : field.name === 'due_date' && draft.start_date
+                                      ? t('Ongoing')
+                                      : t('Pick a date')
+                            }}
+                        </span>
+                    </button>
+                </div>
+                <Calendar
+                    :key="activeField"
+                    class="w-fit max-w-full mx-auto"
+                    prevent-deselect
+                    :model-value="selectedDate"
+                    :default-placeholder="calendarAnchor"
+                    :week-starts-on="weekStartsOn"
+                    @update:model-value="selectDate" />
+                <p
+                    v-if="error"
+                    role="alert"
+                    class="px-3 pb-2 text-xs text-red-600 dark:text-red-400">
+                    {{ t(error) }}
+                </p>
+                <div class="flex items-center justify-between gap-1 border-t border-border p-2">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        :disabled="!draft.start_date && !draft.due_date"
+                        @click="clearDraft">
+                        {{ t('Clear dates') }}
                     </Button>
-                </PopoverTrigger>
-                <PopoverContent align="start" class="w-auto p-0">
-                    <Calendar
-                        initial-focus
-                        :model-value="calendarDates[field.name]"
-                        :week-starts-on="weekStartsOn"
-                        @update:model-value="selectDate(field.name, $event)" />
-                    <div
-                        v-if="dates.start_date || dates.due_date"
-                        class="border-t border-border p-2">
-                        <Button
-                            v-if="field.name === 'start_date'"
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            @click="clearDates">
-                            {{ t('Clear dates') }}
-                        </Button>
-                        <Button
-                            v-else-if="dates.start_date"
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            @click="setOngoing">
-                            {{ t('Ongoing · No due date') }}
-                        </Button>
-                    </div>
-                </PopoverContent>
-            </Popover>
-        </Field>
-        <p
-            v-if="error"
-            :id="errorId"
-            role="alert"
-            class="col-span-2 text-xs text-red-600 dark:text-red-400">
-            {{ t(error) }}
-        </p>
-    </div>
+                    <Button
+                        v-if="draft.start_date && draft.due_date"
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        :aria-label="t('Ongoing · No due date')"
+                        @click="
+                            draft.due_date = null;
+                            activeField = 'due_date';
+                        ">
+                        {{ t('Ongoing') }}
+                    </Button>
+                    <Button type="button" size="sm" :disabled="!!error" @click="apply">
+                        {{ t('Apply') }}
+                    </Button>
+                </div>
+            </PopoverContent>
+        </Popover>
+    </Field>
 </template>

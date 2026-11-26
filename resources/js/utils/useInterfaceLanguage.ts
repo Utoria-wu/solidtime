@@ -56,6 +56,7 @@ const zhCN: Record<string, string> = {
     'Start date': '开始日期',
     'Pick a date': '选择日期',
     'Clear dates': '清除排期',
+    Apply: '应用',
     'Ongoing · No due date': '持续进行 · 无截止日期',
     'Choose a start date before saving a due date.': '请先选择开始日期，再保存截止日期。',
     'Due date must be on or after the start date.': '截止日期不能早于开始日期。',

@@ -2,7 +2,7 @@
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
-import { computed, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import { useFocus } from '@vueuse/core';
 import { useTasksStore } from '@/utils/useTasks';
@@ -11,7 +11,7 @@ import TimeEntryNotesField from '@/packages/ui/src/TimeEntry/TimeEntryNotesField
 import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import TaskCategoryField from './TaskCategoryField.vue';
 import TaskStageField from './TaskStageField.vue';
-import TaskDatesField, { getTaskDateError } from './TaskDatesField.vue';
+import TaskDatesField from './TaskDatesField.vue';
 import EstimatedTimeSection from '@/packages/ui/src/EstimatedTimeSection.vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { Field, FieldGroup, FieldLabel } from '@/packages/ui/src/field';
@@ -60,10 +60,8 @@ watch(
     }
 );
 
-const taskDatesError = computed(() => getTaskDateError(taskDates.value));
-
 async function submit() {
-    if (saving.value || taskDatesError.value) return;
+    if (saving.value) return;
     saving.value = true;
     try {
         const result = await createTask({
@@ -128,8 +126,8 @@ useFocus(taskNameInput, { initialValue: true });
                         </template>
                     </ProjectDropdown>
                 </Field>
-                <div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-3">
-                    <TaskDatesField v-model="taskDates" class="sm:col-span-2" />
+                <div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
+                    <TaskDatesField v-model="taskDates" />
                     <EstimatedTimeSection
                         v-if="isAllowedToPerformPremiumAction()"
                         v-model="estimatedTime"
@@ -147,7 +145,7 @@ useFocus(taskNameInput, { initialValue: true });
             <PrimaryButton
                 class="ms-3"
                 :class="{ 'opacity-25': saving }"
-                :disabled="saving || Boolean(taskDatesError)"
+                :disabled="saving"
                 @click="submit">
                 Create Task
             </PrimaryButton>
