@@ -1,62 +1,21 @@
-# solidtime - The modern Open-Source TimeTracker
+# Link project tasks and show their relationships in History
 
-[![GitHub License](https://img.shields.io/github/license/solidtime-io/solidtime?style=flat-square)](https://github.com/solidtime-io/solidtime/blob/main/LICENSE.md)
-[![Codecov](https://img.shields.io/codecov/c/github/solidtime-io/solidtime?style=flat-square&logo=codecov)](https://codecov.io/gh/solidtime-io/solidtime)
-![GitHub Actions Unit Tests Status](https://img.shields.io/github/actions/workflow/status/solidtime-io/solidtime/phpunit.yml?style=flat-square)
-![PHPStan badge](https://img.shields.io/badge/PHPStan-Level_7-blue?style=flat-square&color=blue)
+## What changes
 
-![Screenshot of the solidtime application with header: solidtime - The modern Open-Source Time Tracker](docs/solidtime-banner.png "solidtime Banner")
+- Choose **Link task** from a task's actions menu. Select a task in the same project and choose **Fixes**, **Verifies**, or **Follows up on**. The form previews the direction before saving.
+- In project **History**, expand **Show task map** beneath a linked task's record. Solidtime draws the stored relationships inline, including follow-up branches. Selecting a node opens the existing task Activity panel.
+- Open **Link task** again to remove an outgoing link. Repeated saves of the same link are idempotent. Project permissions, same-project validation, and cycle checks apply to relationship writes.
 
-solidtime is a modern open-source time tracking application for Freelancers and Agencies.
+## Screenshots
 
-## Features
+![Linking a verification task to its fix](.github/feature-images/link-task-dialog.png)
 
- - Time tracking: Track your time with a modern and easy-to-use interface
- - Projects: Create and manage projects and assign project members
- - Tasks: Create and manage tasks and assign tasks to projects
- - Clients: Create and manage clients and assign clients to projects
- - Billable rates: Set billable rates for projects, project members, organization members and organizations 
- - Multiple organizations: Create and manage multiple organizations with one account
- - Roles and permissions: Create and manage organizations
- - Import: Import your time tracking data from other time tracking applications (Supported: Toggl, Clockify, Timeentry CSV)
+![Saved task relationships expanded inline in project History](.github/feature-images/task-relationships-history.png)
 
-## Self Hosting
+## Verification
 
-If you are looking into self-hosting solidtime, you can find the guides [here](https://docs.solidtime.io/self-hosting/intro)
+- Ran TypeScript checking and built the production frontend assets.
+- Ran the Task Relationship and Task History endpoint tests against a separate local PostgreSQL test database. All 7 tests passed with 83 assertions.
+- In a local Solidtime preview, created three links through the browser, read them back through the API, and expanded the graph before and after reloading. Checked task Activity, narrow-screen relationship labels, and unlinking.
 
-We also have an examples repository [here](https://github.com/solidtime-io/self-hosting-examples)
-
-If you do not want to self-host solidtime or try it out you can sign up for [solidtime cloud](https://www.solidtime.io/)
-
-## Issues & Feature Requests
-
-If you 
-* find any **bugs in solidtime**, please feel free to [**open an issue**](https://github.com/solidtime-io/solidtime/issues/new) in this repository, with instructions on how to reproduce the bug. 
-* have a **feature request**, please [**create a discussion**](https://github.com/solidtime-io/solidtime/discussions/new?category=feature-requests) in this repository.
-
-
-> **Do not use AI-generated text in issues, discussions and PR descriptions.**
->
-> We are human, so please write in natural language in your issues, discussions, and PR descriptions.
-> Don't be a meatproxy. We will ban people who repeatedly violate this rule from further communication on our repositories.
-
-
-## Contributing
-
-Please open an issue or start a discussion and wait for approval before submitting a pull request. This does not apply to tiny fixes or changes however, please keep in mind that we might not merge PRs for various reasons. 
-
-**If you submit an AI slop pull request (especially without following the proper procedure), you will be banned from future contributions to solidtime.**
-
-To keep that manageable, pull requests from authors who are not vouched are closed automatically, unless they change 50 lines or fewer. To get vouched, open an issue or discussion first and explain how you intend to implement the change. Once we have agreed on the approach, we vouch for you. See [Vouched contributors](./CONTRIBUTING.md#vouched-contributors).
-
-Please read the [CONTRIBUTING.md](./CONTRIBUTING.md) before sumbitting a Pull Request.
-
-We do accept contributions in the [documentation repository](https://github.com/solidtime-io/docs) f.e. to add new self-hosting guides.
-
-## Security
-
-Looking to report a vulnerability? Please refer our [SECURITY.md](./SECURITY.md) file.
-
-## License
-
-This project is open-source and available under the GNU Affero General Public License v3.0 (AGPL v3). Please see the [license file](LICENSE.md) for more information.
+[Upstream Solidtime README](https://github.com/solidtime-io/solidtime#readme)
