@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, ref, useId, type ComputedRef } from 'vue';
+import { computed, inject, ref, shallowRef, useId, type ComputedRef } from 'vue';
 import { parseDate, type DateValue } from '@internationalized/date';
 import { Button } from '@/packages/ui/src/Buttons';
 import { Field, FieldLabel } from '@/packages/ui/src/field';
@@ -7,7 +7,12 @@ import { CalendarIcon, ChevronDown } from '@lucide/vue';
 import { Popover, PopoverContent, PopoverTrigger } from '@/packages/ui/src/popover';
 import { Calendar, CalendarCellTrigger } from '@/packages/ui/src/calendar';
 import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
-import { firstDayIndex, formatDate, type WeekStartDay } from '@/packages/ui/src/utils/time';
+import {
+    firstDayIndex,
+    formatDate,
+    getLocalizedDayJs,
+    type WeekStartDay,
+} from '@/packages/ui/src/utils/time';
 import type { Organization } from '@/packages/api/src';
 
 type TaskDates = { start_date: string | null; due_date: string | null };
@@ -22,6 +27,7 @@ const startDescriptionId = id + '-start-date';
 const dueDescriptionId = id + '-due-date';
 const open = ref(false);
 const activeField = ref<keyof TaskDates>('start_date');
+const visibleDate = shallowRef<DateValue>(parseDate(getLocalizedDayJs().format('YYYY-MM-DD')));
 const draft = ref<TaskDates>({ start_date: null, due_date: null });
 const { t } = useInterfaceLanguage();
 const organization = inject<ComputedRef<Organization>>('organization');
@@ -33,16 +39,6 @@ const summary = computed(() => {
     if (!start) return due ? format(due) : t('No dates set');
     if (!due) return format(start) + ' · ' + t('Ongoing');
     return start === due ? format(start) : format(start) + ' – ' + format(due);
-});
-
-const selectedDate = computed(() => {
-    const date = draft.value[activeField.value];
-    return date ? parseDate(date) : undefined;
-});
-
-const calendarAnchor = computed(() => {
-    const date = draft.value[activeField.value] ?? draft.value.start_date ?? draft.value.due_date;
-    return date ? parseDate(date) : undefined;
 });
 
 const error = computed(() => {
@@ -68,12 +64,26 @@ function updateOpen(value: boolean) {
     if (value) {
         draft.value = { ...dates.value };
         activeField.value = 'start_date';
+        visibleDate.value = parseDate(
+            draft.value.start_date ??
+                draft.value.due_date ??
+                getLocalizedDayJs().format('YYYY-MM-DD')
+        );
     }
     open.value = value;
 }
 
+function editField(field: keyof TaskDates) {
+    activeField.value = field;
+    const date = draft.value[field];
+    if (date) visibleDate.value = parseDate(date);
+}
+
 function selectDate(value: DateValue | undefined) {
-    if (value) draft.value[activeField.value] = value.toString();
+    if (!value) return;
+    draft.value[activeField.value] = value.toString();
+    visibleDate.value = value;
+    if (activeField.value === 'start_date') activeField.value = 'due_date';
 }
 
 function clearDraft() {
@@ -119,7 +129,7 @@ function apply() {
                             type="button"
                             :aria-pressed="activeField === field.name"
                             class="flex min-w-0 flex-col gap-0.5 rounded-md border border-border px-2.5 py-1.5 text-left hover:bg-tertiary focus-visible:outline-2 focus-visible:outline-ring aria-pressed:border-accent-500 aria-pressed:bg-accent-500/5"
-                            @click="activeField = field.name">
+                            @click="editField(field.name)">
                             <span
                                 class="flex items-center gap-1.5 text-xs font-medium text-text-secondary">
                                 <span
@@ -141,11 +151,9 @@ function apply() {
                         </button>
                     </div>
                     <Calendar
-                        :key="activeField"
+                        v-model:placeholder="visibleDate"
+                        :model-value="null"
                         class="w-fit max-w-full mx-auto"
-                        prevent-deselect
-                        :model-value="selectedDate"
-                        :default-placeholder="calendarAnchor"
                         :week-starts-on="weekStartsOn"
                         @update:model-value="selectDate">
                         <template #day="{ date, month }">
