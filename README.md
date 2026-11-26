@@ -7,19 +7,19 @@ Project Schedule spread its controls across multiple rows, and the task form com
 ## Changes
 
 - Place the view selector, date navigation, and Create Task on one toolbar. Show compact schedule dates and place elapsed time beside task controls.
-- Give Start date and Due date their own calendar buttons. Reject reversed dates before saving and keep the Ongoing option in the due date picker.
+- Use one Task dates popover with distinct Start date and Due date buttons, a shared calendar, and one Apply action. Reject reversed dates before applying and keep the Ongoing option.
 - Use the primary text color for category labels and preserve their colors as dots.
 - Separate running timers from the language and profile settings. Move Log Out and Feedback to the organization menu.
 
 ## Verification
 
-Built the frontend and ran Vue type checking. In the local preview, created and edited a sample task, checked the stored dates, verified the invalid-range message and open-ended Schedule bar, and confirmed the organization menu actually signs out the preview account.
+Built the frontend and ran Vue type checking. In the local preview, created and edited a sample task, checked the stored dates, verified keyboard switching, draft dismissal, narrow-screen layout, the invalid-range message and open-ended Schedule bar, and confirmed the organization menu actually signs out the preview account.
 
 ## Screenshots
 
 ![Project Schedule and separated sidebar sections](.github/feature-images/refined-project-schedule-layout.png)
 
-![Create Task with independent Start date and Due date controls](.github/feature-images/project-task-separate-dates.png)
+![Start date and Due date fields in a single Task dates picker](.github/feature-images/project-task-unified-date-picker.png)
 
 ![Readable task categories and sidebar separation](.github/feature-images/project-task-contrast-and-sidebar.png)
 
