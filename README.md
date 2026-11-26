@@ -1,62 +1,21 @@
-# solidtime - The modern Open-Source TimeTracker
+# Locate running tasks in their project
 
-[![GitHub License](https://img.shields.io/github/license/solidtime-io/solidtime?style=flat-square)](https://github.com/solidtime-io/solidtime/blob/main/LICENSE.md)
-[![Codecov](https://img.shields.io/codecov/c/github/solidtime-io/solidtime?style=flat-square&logo=codecov)](https://codecov.io/gh/solidtime-io/solidtime)
-![GitHub Actions Unit Tests Status](https://img.shields.io/github/actions/workflow/status/solidtime-io/solidtime/phpunit.yml?style=flat-square)
-![PHPStan badge](https://img.shields.io/badge/PHPStan-Level_7-blue?style=flat-square&color=blue)
+## Why
 
-![Screenshot of the solidtime application with header: solidtime - The modern Open-Source Time Tracker](docs/solidtime-banner.png "solidtime Banner")
+The Running tasks sidebar links to the project, but the user still has to find the running task in the list. That takes time when a project contains many similar rows.
 
-solidtime is a modern open-source time tracking application for Freelancers and Agencies.
+## Changes
 
-## Features
+- Link each running task to its project with the task ID and open the corresponding task list.
+- Scroll the target row into view, focus its task button, and briefly emphasize the entire row. A repeated click on the sidebar link highlights the task again.
+- Use a temporary static highlight when reduced motion is enabled.
 
- - Time tracking: Track your time with a modern and easy-to-use interface
- - Projects: Create and manage projects and assign project members
- - Tasks: Create and manage tasks and assign tasks to projects
- - Clients: Create and manage clients and assign clients to projects
- - Billable rates: Set billable rates for projects, project members, organization members and organizations 
- - Multiple organizations: Create and manage multiple organizations with one account
- - Roles and permissions: Create and manage organizations
- - Import: Import your time tracking data from other time tracking applications (Supported: Toggl, Clockify, Timeentry CSV)
+## Verification
 
-## Self Hosting
+Built the frontend and tested against the local Solidtime preview with 42 sample tasks. Verified cross-project navigation, correct row focus, repeated links from the same project, manual view changes, and reduced motion.
 
-If you are looking into self-hosting solidtime, you can find the guides [here](https://docs.solidtime.io/self-hosting/intro)
+## Screenshot
 
-We also have an examples repository [here](https://github.com/solidtime-io/self-hosting-examples)
+![The target task highlighted in the project list after selecting it in the Running tasks sidebar](.github/feature-images/running-task-location.png)
 
-If you do not want to self-host solidtime or try it out you can sign up for [solidtime cloud](https://www.solidtime.io/)
-
-## Issues & Feature Requests
-
-If you 
-* find any **bugs in solidtime**, please feel free to [**open an issue**](https://github.com/solidtime-io/solidtime/issues/new) in this repository, with instructions on how to reproduce the bug. 
-* have a **feature request**, please [**create a discussion**](https://github.com/solidtime-io/solidtime/discussions/new?category=feature-requests) in this repository.
-
-
-> **Do not use AI-generated text in issues, discussions and PR descriptions.**
->
-> We are human, so please write in natural language in your issues, discussions, and PR descriptions.
-> Don't be a meatproxy. We will ban people who repeatedly violate this rule from further communication on our repositories.
-
-
-## Contributing
-
-Please open an issue or start a discussion and wait for approval before submitting a pull request. This does not apply to tiny fixes or changes however, please keep in mind that we might not merge PRs for various reasons. 
-
-**If you submit an AI slop pull request (especially without following the proper procedure), you will be banned from future contributions to solidtime.**
-
-To keep that manageable, pull requests from authors who are not vouched are closed automatically, unless they change 50 lines or fewer. To get vouched, open an issue or discussion first and explain how you intend to implement the change. Once we have agreed on the approach, we vouch for you. See [Vouched contributors](./CONTRIBUTING.md#vouched-contributors).
-
-Please read the [CONTRIBUTING.md](./CONTRIBUTING.md) before sumbitting a Pull Request.
-
-We do accept contributions in the [documentation repository](https://github.com/solidtime-io/docs) f.e. to add new self-hosting guides.
-
-## Security
-
-Looking to report a vulnerability? Please refer our [SECURITY.md](./SECURITY.md) file.
-
-## License
-
-This project is open-source and available under the GNU Affero General Public License v3.0 (AGPL v3). Please see the [license file](LICENSE.md) for more information.
+[Upstream Solidtime README](https://github.com/solidtime-io/solidtime#readme)
