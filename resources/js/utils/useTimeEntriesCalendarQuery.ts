@@ -98,22 +98,22 @@ export async function fetchAllCalendarEntries(
 export function useTimeEntriesCalendarQuery(
     calendarStart: Ref<Dayjs | undefined>,
     calendarEnd: Ref<Dayjs | undefined>,
-    prefetchNeighbors: Ref<boolean>
+    isTimeGrid: Ref<boolean>
 ) {
     const enableCalendarQuery = computed(() => {
-        return !!getCurrentOrganizationId() && !!calendarStart.value && !!calendarEnd.value;
+        return (
+            isTimeGrid.value &&
+            !!getCurrentOrganizationId() &&
+            !!calendarStart.value &&
+            !!calendarEnd.value
+        );
     });
 
     const expandedDateRange = computed(() => {
-        if (!calendarStart.value || !calendarEnd.value) {
+        if (!isTimeGrid.value || !calendarStart.value || !calendarEnd.value) {
             return { start: null, end: null };
         }
-        return prefetchNeighbors.value
-            ? getExpandedCalendarDateRange(calendarStart.value, calendarEnd.value)
-            : {
-                  start: localDateToUtc(calendarStart.value),
-                  end: localDateToUtc(calendarEnd.value),
-              };
+        return getExpandedCalendarDateRange(calendarStart.value, calendarEnd.value);
     });
 
     return useQuery<TimeEntryResponse>({

@@ -32,22 +32,22 @@ const emit = defineEmits<{
             v-if="activeView === 'month' || activeView === 'year'"
             class="flex flex-wrap items-center gap-1.5">
             <Button
-                variant="outline"
+                variant="ghost"
                 size="icon"
-                class="h-8 w-8"
+                class="size-8 rounded-full hover:bg-secondary"
                 aria-label="Previous"
                 @click="emit('prev')">
                 <ChevronLeft class="size-4" />
             </Button>
             <h1
-                class="min-w-20 whitespace-nowrap px-1 text-center text-lg font-medium tracking-tight"
+                class="order-first mr-2 whitespace-nowrap text-xl font-semibold tracking-tight sm:text-2xl"
                 data-testid="calendar-title">
                 {{ rangeLabel }}
             </h1>
             <Button
-                variant="outline"
+                variant="ghost"
                 size="icon"
-                class="h-8 w-8"
+                class="size-8 rounded-full hover:bg-secondary"
                 aria-label="Next"
                 @click="emit('next')">
                 <ChevronRight class="size-4" />

@@ -4,7 +4,6 @@ import { useTimeEntriesCalendarQuery } from '@/utils/useTimeEntriesCalendarQuery
 import { useTimeEntriesMutations } from '@/utils/useTimeEntriesMutations';
 import { computed, ref, onMounted } from 'vue';
 import { useEventListener, useLocalStorage } from '@vueuse/core';
-import { router } from '@inertiajs/vue3';
 import { Bell, ChevronDown, Plus, Upload } from '@lucide/vue';
 import axios from 'axios';
 import type { Dayjs } from 'dayjs';
@@ -18,7 +17,7 @@ import {
 } from '@/packages/api/src';
 import { TimeEntryCalendar } from '@/packages/ui/src';
 import { Button } from '@/packages/ui/src/Buttons';
-import { getDayJsInstance, getLocalizedDayJs } from '@/packages/ui/src/utils/time';
+import { getDayJsInstance } from '@/packages/ui/src/utils/time';
 import type { CalendarView } from '@/packages/ui/src/FullCalendar/useCalendarNavigation';
 import CalendarOverview, {
     type CalendarOverviewItem,
@@ -55,7 +54,7 @@ const calendarView = ref<CalendarView>('timeGridWeek');
 const calendarDateKey = (day: Dayjs) => day.format('YYYY-MM-DD');
 const startKey = computed(() => (calendarStart.value ? calendarDateKey(calendarStart.value) : ''));
 const endKey = computed(() => (calendarEnd.value ? calendarDateKey(calendarEnd.value) : ''));
-const prefetchNeighbors = computed(
+const isTimeGrid = computed(
     () => calendarView.value === 'timeGridDay' || calendarView.value === 'timeGridWeek'
 );
 
@@ -94,7 +93,7 @@ const {
     data: timeEntryResponse,
     isLoading: timeEntriesLoading,
     isError: timeEntriesError,
-} = useTimeEntriesCalendarQuery(calendarStart, calendarEnd, prefetchNeighbors);
+} = useTimeEntriesCalendarQuery(calendarStart, calendarEnd, isTimeGrid);
 
 const currentTimeEntries = computed(() => {
     return timeEntryResponse?.value?.data || [];
@@ -154,22 +153,6 @@ const calendarItems = computed(() => {
                 time: reminder.time,
                 start: reminder.date,
                 end: calendarDateKey(dayjs.utc(reminder.date).add(1, 'day')),
-            });
-        }
-    }
-    if (sources.value.entries && !prefetchNeighbors.value) {
-        for (const entry of currentTimeEntries.value) {
-            const start = getLocalizedDayJs(entry.start);
-            const end = entry.end ? getLocalizedDayJs(entry.end) : getLocalizedDayJs();
-            const last = end.isAfter(start) ? end.subtract(1, 'millisecond') : start;
-            add({
-                key: entry.id,
-                kind: 'entry',
-                title: entry.description || 'Untitled time entry',
-                start: calendarDateKey(start),
-                end: calendarDateKey(last.add(1, 'day')),
-                entryId: entry.end ? entry.id : undefined,
-                time: start.format('HH:mm'),
             });
         }
     }
@@ -374,7 +357,7 @@ function onRefresh() {
         data-testid="calendar_view"
         main-class="p-0 min-h-0 overflow-hidden">
         <p
-            v-if="personalError || timeEntriesError"
+            v-if="personalError || (isTimeGrid && timeEntriesError)"
             role="alert"
             class="border-b border-border px-6 py-2 text-sm text-destructive">
             {{
@@ -413,7 +396,9 @@ function onRefresh() {
             </button>
         </div>
         <TimeEntryCalendar
-            :time-entries="sources.entries || initialEntryId ? currentTimeEntries : []"
+            :time-entries="
+                isTimeGrid && (sources.entries || initialEntryId) ? currentTimeEntries : []
+            "
             :projects="projects"
             :tasks="tasks"
             :clients="clients"
@@ -446,7 +431,9 @@ function onRefresh() {
                     </summary>
                     <div
                         class="absolute left-0 top-full z-30 mt-1 min-w-44 rounded-md border border-border bg-card-background p-2 text-sm shadow-md sm:left-auto sm:right-0">
-                        <label class="flex items-center gap-2 rounded px-2 py-1.5">
+                        <label
+                            v-if="isTimeGrid"
+                            class="flex items-center gap-2 rounded px-2 py-1.5">
                             <input v-model="sources.entries" type="checkbox" class="rounded" /> Time
                             entries
                         </label>
@@ -477,9 +464,11 @@ function onRefresh() {
                 </details>
                 <Button
                     size="sm"
-                    class="bg-button-primary-background text-button-primary-text hover:bg-button-primary-background-hover"
+                    class="size-8 px-0 bg-button-primary-background text-button-primary-text hover:bg-button-primary-background-hover sm:w-auto sm:px-3"
+                    aria-label="New reminder"
                     @click="openReminder(date)">
-                    <Plus /> Reminder
+                    <Plus aria-hidden="true" />
+                    <span class="hidden sm:inline">Reminder</span>
                 </Button>
             </template>
             <template #overview="{ view, date, navigate }">
@@ -488,17 +477,12 @@ function onRefresh() {
                     :view="view"
                     :date="date"
                     :items="calendarItems"
-                    :loading="timeEntriesLoading || personalLoading"
-                    :show-entries="sources.entries"
+                    :loading="personalLoading"
                     :show-reminders="sources.reminders"
                     :show-holidays="sources.holidays"
                     @select="(selected) => navigate('month', selected)"
                     @month="
                         (month) => navigate('month', month.isSame(date, 'month') ? date : month)
-                    "
-                    @entry="
-                        (id, day) =>
-                            router.get('/calendar', { date: calendarDateKey(day), entry: id })
                     "
                     @edit="(item) => openReminder(date, item)"
                     @add="openReminder(date)" />
