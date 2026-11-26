@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
 import { useTaskCategories, type TaskCategory } from '@/utils/useTaskHistory';
 import { canCreateTags, canUpdateTags } from '@/utils/permissions';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
@@ -17,14 +17,61 @@ const availableCategories = computed(() =>
 );
 const editing = ref<string>();
 const name = ref('');
-const color = ref('#5389b0');
+const defaultColor = '#5389b0';
+const colorText = ref(defaultColor);
+const lastValidColor = ref(defaultColor);
+const colorTouched = ref(false);
+const colorId = useId();
+const colorErrorId = useId();
 const order = ref(0);
 const archived = ref(false);
 const busy = ref(false);
+
+const parsedColor = computed(() => {
+    const text = colorText.value.trim();
+    const hex = /^#?([\da-f]{3}|[\da-f]{6})$/i.exec(text)?.[1]?.toLowerCase();
+    if (hex) {
+        return '#' + (hex.length === 3 ? [...hex].map((digit) => digit.repeat(2)).join('') : hex);
+    }
+
+    const rgb = /^rgb\s*\(\s*([\s\S]*?)\s*\)$/i.exec(text)?.[1] ?? text;
+    const channels = rgb.includes(',')
+        ? rgb.split(',').map((part) => part.trim())
+        : rgb.split(/\s+/);
+    if (
+        channels.length !== 3 ||
+        channels.some((part) => !/^\d{1,3}$/.test(part) || Number(part) > 255)
+    ) {
+        return null;
+    }
+    return '#' + channels.map((part) => Number(part).toString(16).padStart(2, '0')).join('');
+});
+
+const pickerColor = computed({
+    get: () => parsedColor.value ?? lastValidColor.value,
+    set: (value: string) => {
+        colorText.value = value;
+    },
+});
+const showColorError = computed(() => colorTouched.value && !parsedColor.value);
+watch(parsedColor, (value) => {
+    if (value) lastValidColor.value = value;
+});
+
+function pasteColor(event: ClipboardEvent) {
+    const text = event.clipboardData?.getData('text/plain').trim();
+    if (!text) return;
+    event.preventDefault();
+    colorText.value = text.replace(/\s+/g, ' ');
+    colorTouched.value = true;
+}
+
 function edit(item?: TaskCategory) {
     editing.value = item?.id;
     name.value = item?.name ?? '';
-    color.value = item?.color ?? '#5389b0';
+    colorText.value = item?.color ?? defaultColor;
+    lastValidColor.value = colorText.value;
+    colorTouched.value = false;
     order.value = item?.sort_order ?? categories.value.length;
     archived.value = item?.is_archived ?? false;
 }
@@ -33,6 +80,10 @@ watch(show, (open) => {
 });
 
 async function submit() {
+    if (!parsedColor.value) {
+        colorTouched.value = true;
+        return;
+    }
     if (busy.value || !name.value.trim() || !(editing.value ? canUpdateTags() : canCreateTags()))
         return;
     busy.value = true;
@@ -40,7 +91,7 @@ async function submit() {
         const saved = await save(
             {
                 name: name.value.trim(),
-                color: color.value,
+                color: parsedColor.value,
                 sort_order: order.value,
                 is_archived: archived.value,
             },
@@ -103,20 +154,42 @@ async function submit() {
                         maxlength="100"
                         autocomplete="off"
                 /></label>
-                <div class="flex items-end gap-5">
+                <div class="flex flex-wrap items-start gap-x-5 gap-y-3">
+                    <div class="min-w-0">
+                        <label :for="colorId" class="text-sm">Color</label>
+                        <div class="mt-2 flex items-center gap-2">
+                            <input
+                                v-model="pickerColor"
+                                type="color"
+                                aria-label="Pick category color"
+                                class="h-10 w-11 shrink-0 cursor-pointer rounded-md border border-input-border bg-input-background" />
+                            <TextInput
+                                :id="colorId"
+                                v-model="colorText"
+                                class="h-10 w-40 min-w-0"
+                                placeholder="RGB or hex"
+                                autocomplete="off"
+                                spellcheck="false"
+                                :aria-invalid="showColorError || undefined"
+                                :aria-describedby="showColorError ? colorErrorId : undefined"
+                                @paste="pasteColor"
+                                @blur="colorTouched = true" />
+                        </div>
+                        <p
+                            v-if="showColorError"
+                            :id="colorErrorId"
+                            class="mt-1.5 text-xs text-destructive">
+                            Enter a color like 83, 137, 176 or #5389b0.
+                        </p>
+                    </div>
                     <label class="text-sm"
-                        >Color<input
-                            v-model="color"
-                            type="color"
-                            class="mt-2 block h-10 w-16 cursor-pointer rounded border border-default-background-separator" /></label
-                    ><label class="text-sm"
                         >Order<input
                             v-model.number="order"
                             type="number"
                             min="0"
                             max="1000000"
                             class="mt-2 block w-24 rounded-lg border border-default-background-separator bg-default-background p-2" /></label
-                    ><label v-if="!selectOnSave" class="pb-2 text-sm"
+                    ><label v-if="!selectOnSave" class="mt-8 text-sm"
                         ><input v-model="archived" type="checkbox" class="mr-2" />Archived</label
                     >
                 </div>
@@ -127,7 +200,7 @@ async function submit() {
             ><PrimaryButton
                 v-if="editing ? canUpdateTags() : canCreateTags()"
                 class="ml-3"
-                :disabled="busy || !name.trim()"
+                :disabled="busy || !name.trim() || !parsedColor"
                 @click="submit"
                 >{{ busy ? 'Saving…' : 'Save category' }}</PrimaryButton
             ></template
