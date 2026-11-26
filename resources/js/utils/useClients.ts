@@ -30,7 +30,7 @@ export const useClientsStore = defineStore('clients', () => {
     async function updateClient(clientId: string, clientBody: UpdateClientBody) {
         const organization = getCurrentOrganizationId();
         if (organization) {
-            await handleApiRequestNotifications(
+            const response = await handleApiRequestNotifications(
                 () =>
                     api.updateClient(clientBody, {
                         params: {
@@ -42,6 +42,7 @@ export const useClientsStore = defineStore('clients', () => {
                 'Failed to update client'
             );
             queryClient.invalidateQueries({ queryKey: ['clients'] });
+            return response?.data;
         }
     }
 

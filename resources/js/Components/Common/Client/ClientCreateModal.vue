@@ -7,7 +7,8 @@ import type { CreateClientBody } from '@/packages/api/src';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import { useFocus } from '@vueuse/core';
 import { useClientsStore } from '@/utils/useClients';
-import { Field, FieldLabel } from '@/packages/ui/src/field';
+import { Field, FieldGroup, FieldLabel } from '@/packages/ui/src/field';
+import TimeEntryNotesField from '@/packages/ui/src/TimeEntry/TimeEntryNotesField.vue';
 
 const { createClient } = useClientsStore();
 const show = defineModel('show', { default: false });
@@ -15,12 +16,21 @@ const saving = ref(false);
 
 const client = ref<CreateClientBody>({
     name: '',
+    markdown_notes: null,
 });
 
 async function submit() {
-    await createClient(client.value);
-    client.value.name = '';
-    show.value = false;
+    if (saving.value) return;
+    saving.value = true;
+    try {
+        const result = await createClient(client.value);
+        if (result) {
+            client.value = { name: '', markdown_notes: null };
+            show.value = false;
+        }
+    } finally {
+        saving.value = false;
+    }
 }
 
 const clientNameInput = ref<HTMLInputElement | null>(null);
@@ -36,8 +46,8 @@ useFocus(clientNameInput, { initialValue: true });
         </template>
 
         <template #content>
-            <div class="flex items-center space-x-4">
-                <Field class="col-span-6 sm:col-span-4 flex-1">
+            <FieldGroup>
+                <Field>
                     <FieldLabel for="clientName">Client Name</FieldLabel>
                     <TextInput
                         id="clientName"
@@ -47,10 +57,11 @@ useFocus(clientNameInput, { initialValue: true });
                         placeholder="Client Name"
                         class="block w-full"
                         required
-                        autocomplete="clientName"
+                        autocomplete="off"
                         @keydown.enter="submit" />
                 </Field>
-            </div>
+                <TimeEntryNotesField v-model="client.markdown_notes" label="Client notes" />
+            </FieldGroup>
         </template>
         <template #footer>
             <SecondaryButton @click="show = false"> Cancel </SecondaryButton>

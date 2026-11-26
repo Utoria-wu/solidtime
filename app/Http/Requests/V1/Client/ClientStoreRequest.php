@@ -34,6 +34,7 @@ class ClientStoreRequest extends BaseFormRequest
                     return $builder->whereBelongsTo($this->organization, 'organization');
                 })->withCustomTranslation('validation.client_name_already_exists'),
             ],
+            'markdown_notes' => ['nullable', 'string', 'max:10000'],
         ];
     }
 }

@@ -364,9 +364,12 @@ class ClientEndpointTest extends ApiEndpointTestAbstract
         $clientFake = Client::factory()->make();
         Passport::actingAs($data->user);
 
+        $notes = "## Handover\n\n- Send the availability report";
+
         // Act
         $response = $this->putJson(route('api.v1.clients.update', [$data->organization->getKey(), $client->getKey()]), [
             'name' => $clientFake->name,
+            'markdown_notes' => $notes,
         ]);
 
         // Assert
@@ -374,11 +377,24 @@ class ClientEndpointTest extends ApiEndpointTestAbstract
         $response->assertJson(fn (AssertableJson $json) => $json
             ->has('data')
             ->where('data.name', $clientFake->name)
+            ->where('data.markdown_notes', $notes)
         );
         $this->assertDatabaseHas(Client::class, [
             'name' => $clientFake->name,
+            'markdown_notes' => $notes,
             'organization_id' => $data->organization->getKey(),
         ]);
+
+        $endpoint = route('api.v1.clients.update', [$data->organization->getKey(), $client->getKey()]);
+        $this->putJson($endpoint, [
+            'name' => $clientFake->name,
+            'is_archived' => true,
+        ])->assertOk()->assertJsonPath('data.markdown_notes', $notes);
+        $this->putJson($endpoint, [
+            'name' => $clientFake->name,
+            'markdown_notes' => null,
+        ])->assertOk()->assertJsonPath('data.markdown_notes', null);
+        $this->assertNull($client->fresh()->markdown_notes);
     }
 
     public function test_update_endpoint_can_archive_a_client(): void

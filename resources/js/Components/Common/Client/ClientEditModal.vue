@@ -2,11 +2,13 @@
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import type { Client, UpdateClientBody } from '@/packages/api/src';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import { useFocus } from '@vueuse/core';
 import { useClientsStore } from '@/utils/useClients';
+import { Field, FieldGroup, FieldLabel } from '@/packages/ui/src/field';
+import TimeEntryNotesField from '@/packages/ui/src/TimeEntry/TimeEntryNotesField.vue';
 
 const { updateClient } = useClientsStore();
 const show = defineModel('show', { default: false });
@@ -16,13 +18,28 @@ const props = defineProps<{
     client: Client;
 }>();
 
-const clientBody = ref<UpdateClientBody>({
-    name: props.client.name,
+const name = ref(props.client.name);
+const initialNotes = ref(props.client.markdown_notes ?? null);
+const notes = ref(initialNotes.value);
+
+watch(show, (isOpen) => {
+    if (!isOpen) return;
+    name.value = props.client.name;
+    initialNotes.value = props.client.markdown_notes ?? null;
+    notes.value = initialNotes.value;
 });
 
 async function submit() {
-    await updateClient(props.client.id, clientBody.value);
-    show.value = false;
+    if (saving.value) return;
+    const body: UpdateClientBody = { name: name.value };
+    if (notes.value !== initialNotes.value) body.markdown_notes = notes.value;
+    saving.value = true;
+    try {
+        const result = await updateClient(props.client.id, body);
+        if (result) show.value = false;
+    } finally {
+        saving.value = false;
+    }
 }
 
 const clientNameInput = ref<HTMLInputElement | null>(null);
@@ -38,20 +55,22 @@ useFocus(clientNameInput, { initialValue: true });
         </template>
 
         <template #content>
-            <div class="flex items-center space-x-4">
-                <div class="col-span-6 sm:col-span-4 flex-1">
+            <FieldGroup>
+                <Field>
+                    <FieldLabel for="clientName">Client Name</FieldLabel>
                     <TextInput
                         id="clientName"
                         ref="clientNameInput"
-                        v-model="clientBody.name"
+                        v-model="name"
                         type="text"
                         placeholder="Client Name"
-                        class="mt-1 block w-full"
+                        class="block w-full"
                         required
-                        autocomplete="clientName"
+                        autocomplete="off"
                         @keydown.enter="submit" />
-                </div>
-            </div>
+                </Field>
+                <TimeEntryNotesField v-model="notes" label="Client notes" />
+            </FieldGroup>
         </template>
         <template #footer>
             <SecondaryButton @click="show = false"> Cancel </SecondaryButton>

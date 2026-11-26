@@ -73,6 +73,7 @@ class ClientController extends Controller
 
         $client = new Client;
         $client->name = $request->input('name');
+        $client->markdown_notes = $request->validated('markdown_notes');
         $client->organization()->associate($organization);
         $client->save();
 
@@ -91,6 +92,9 @@ class ClientController extends Controller
         $this->checkPermission($organization, 'clients:update', $client);
 
         $client->name = $request->input('name');
+        if ($request->has('markdown_notes')) {
+            $client->markdown_notes = $request->validated('markdown_notes');
+        }
         if ($request->has('is_archived')) {
             $client->archived_at = $request->getIsArchived() ? Carbon::now() : null;
         }

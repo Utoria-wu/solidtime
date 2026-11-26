@@ -39,6 +39,7 @@ class ClientUpdateRequest extends BaseFormRequest
             'is_archived' => [
                 'boolean',
             ],
+            'markdown_notes' => ['nullable', 'string', 'max:10000'],
         ];
     }
 

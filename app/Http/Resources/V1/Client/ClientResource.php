@@ -25,6 +25,8 @@ class ClientResource extends BaseResource
             'id' => $this->resource->id,
             /** Name */
             'name' => $this->resource->name,
+            /** Client notes in Markdown */
+            'markdown_notes' => $this->resource->markdown_notes,
             /** Whether the client is archived */
             'is_archived' => $this->resource->is_archived,
             /** When the tag was created */

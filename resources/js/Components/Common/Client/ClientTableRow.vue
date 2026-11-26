@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { CheckCircleIcon, ArchiveBoxIcon } from '@heroicons/vue/24/outline';
 import {
     PencilSquareIcon,
+    DocumentTextIcon,
     ArchiveBoxIcon as ArchiveBoxIconSolid,
     TrashIcon,
 } from '@heroicons/vue/20/solid';
@@ -11,6 +12,9 @@ import { useClientsStore } from '@/utils/useClients';
 import ClientMoreOptionsDropdown from '@/Components/Common/Client/ClientMoreOptionsDropdown.vue';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import TableRow from '@/Components/TableRow.vue';
+import DialogModal from '@/packages/ui/src/DialogModal.vue';
+import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
+import { renderNotes } from '@/packages/ui/src/utils/notes';
 import ClientEditModal from '@/Components/Common/Client/ClientEditModal.vue';
 import { canUpdateClients, canDeleteClients } from '@/utils/permissions';
 import {
@@ -37,24 +41,47 @@ const projectCount = computed(() => {
 
 function archiveClient() {
     useClientsStore().updateClient(props.client.id, {
-        ...props.client,
+        name: props.client.name,
         is_archived: !props.client.is_archived,
     });
 }
 
 const showEditModal = ref(false);
+const showNotes = ref(false);
+const notesHtml = computed(() => (showNotes.value ? renderNotes(props.client.markdown_notes) : ''));
 </script>
 
 <template>
+    <DialogModal :show="showNotes" @close="showNotes = false">
+        <template #title>{{ client.name }}</template>
+        <template #content>
+            <h3 class="mb-2 text-sm font-medium text-text-primary">Client notes</h3>
+            <div
+                class="prose prose-sm max-w-none break-words dark:prose-invert"
+                v-html="notesHtml" />
+        </template>
+        <template #footer>
+            <SecondaryButton @click="showNotes = false">Close</SecondaryButton>
+        </template>
+    </DialogModal>
     <ContextMenu>
         <ContextMenuTrigger as-child>
             <TableRow>
                 <ClientEditModal v-model:show="showEditModal" :client="client"></ClientEditModal>
                 <div
                     class="whitespace-nowrap flex items-center space-x-5 py-4 pr-3 text-sm font-medium text-text-primary pl-4 sm:pl-6 lg:pl-8 3xl:pl-12">
-                    <span>
-                        {{ client.name }}
-                    </span>
+                    <button
+                        v-if="client.markdown_notes"
+                        type="button"
+                        class="inline-flex min-w-0 items-center gap-2 text-left hover:underline"
+                        :aria-label="'Read notes for ' + client.name"
+                        @click="showNotes = true">
+                        <span class="truncate">{{ client.name }}</span>
+                        <DocumentTextIcon
+                            aria-hidden="true"
+                            class="size-4 shrink-0 text-icon-default" />
+                    </button>
+                    <span v-else>{{ client.name }}</span>
                 </div>
                 <div
                     class="whitespace-nowrap flex items-center px-3 py-4 text-sm text-text-primary">

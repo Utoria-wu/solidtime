@@ -19,6 +19,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 /**
  * @property string $id
  * @property string $name
+ * @property string|null $markdown_notes
  * @property string $organization_id
  * @property-read bool $is_archived
  * @property Carbon|null $archived_at

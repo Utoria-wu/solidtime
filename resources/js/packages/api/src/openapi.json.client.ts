@@ -28,14 +28,24 @@ const ClientResource = z
     .object({
         id: z.string(),
         name: z.string(),
+        markdown_notes: z.string().nullable().optional(),
         is_archived: z.boolean(),
         created_at: z.string(),
         updated_at: z.string(),
     })
     .passthrough();
-const ClientStoreRequest = z.object({ name: z.string().min(1).max(255) }).passthrough();
+const ClientStoreRequest = z
+    .object({
+        name: z.string().min(1).max(255),
+        markdown_notes: z.string().max(10000).nullable().optional(),
+    })
+    .passthrough();
 const ClientUpdateRequest = z
-    .object({ name: z.string().min(1).max(255), is_archived: z.boolean().optional() })
+    .object({
+        name: z.string().min(1).max(255),
+        is_archived: z.boolean().optional(),
+        markdown_notes: z.string().max(10000).nullable().optional(),
+    })
     .passthrough();
 const DestroyWithPasswordRequest = z.object({ password: z.string() }).passthrough();
 const ImportRequest = z.object({ type: z.string(), data: z.string() }).passthrough();
@@ -1497,7 +1507,7 @@ const endpoints = makeApi([
             {
                 name: 'body',
                 type: 'Body',
-                schema: z.object({ name: z.string().min(1).max(255) }).passthrough(),
+                schema: ClientStoreRequest,
             },
             {
                 name: 'organization',
