@@ -1,176 +1,140 @@
+<script lang="ts">
+export type TaskDates = { start_date: string | null; due_date: string | null };
+
+export function getTaskDateError({ start_date: start, due_date: due }: TaskDates) {
+    if (!due) return null;
+    if (!start) return 'Choose a start date before saving a due date.';
+    if (due < start) return 'Due date must be on or after the start date.';
+    return null;
+}
+</script>
+
 <script setup lang="ts">
-import { computed, inject, ref, shallowRef, useId, type ComputedRef } from 'vue';
-import { parseDate } from '@internationalized/date';
+import { computed, inject, ref, useId, type ComputedRef } from 'vue';
+import { parseDate, type DateValue } from '@internationalized/date';
 import { Button } from '@/packages/ui/src/Buttons';
 import { Field, FieldLabel } from '@/packages/ui/src/field';
 import { CalendarIcon, ChevronDown } from '@lucide/vue';
-import { CalendarDaysIcon } from '@heroicons/vue/20/solid';
 import { Popover, PopoverContent, PopoverTrigger } from '@/packages/ui/src/popover';
 import { Calendar } from '@/packages/ui/src/calendar';
 import { useInterfaceLanguage } from '@/utils/useInterfaceLanguage';
-import { RangeCalendar } from '@/packages/ui/src/range-calendar';
 import { firstDayIndex, formatDate, type WeekStartDay } from '@/packages/ui/src/utils/time';
 import type { Organization } from '@/packages/api/src';
-import type { DateRange } from 'reka-ui';
 
-const dates = defineModel<{ start_date: string | null; due_date: string | null }>({
-    required: true,
-});
-const triggerId = useId();
-const draftDates = shallowRef<DateRange>({ start: undefined, end: undefined });
-const datePickerOpen = ref(false);
-const ongoing = ref(false);
-const ongoingStart = shallowRef<DateRange['start']>();
+type DateField = keyof TaskDates;
+
+const dates = defineModel<TaskDates>({ required: true });
+const fields = [
+    { name: 'start_date', label: 'Start date' },
+    { name: 'due_date', label: 'Due date' },
+] as const;
+const id = useId();
+const errorId = id + '-error';
+const openField = ref<DateField | null>(null);
 const { t } = useInterfaceLanguage();
 const organization = inject<ComputedRef<Organization>>('organization');
 const weekStartsOn = computed(() => firstDayIndex.value as WeekStartDay);
-const dateRangeLabel = computed(() => {
-    const { start_date: start, due_date: end } = dates.value;
-    const dateFormat = organization?.value.date_format;
-    if (start && !end) return formatDate(start, dateFormat) + ' → ' + t('Ongoing');
-    if (!start || !end) return t('No dates set');
-    if (start === end) return formatDate(start, dateFormat);
-    return formatDate(start, dateFormat) + ' → ' + formatDate(end, dateFormat);
+const error = computed(() => getTaskDateError(dates.value));
+const calendarDates = computed(() => {
+    const { start_date: start, due_date: due } = dates.value;
+    return {
+        start_date: start ? parseDate(start) : undefined,
+        due_date: due ? parseDate(due) : undefined,
+    };
 });
 
-function updateDatePickerOpen(open: boolean) {
-    if (open) {
-        const { start_date: start, due_date: end } = dates.value;
-        ongoing.value = Boolean(start && !end);
-        ongoingStart.value = start ? parseDate(start) : undefined;
-        draftDates.value = {
-            start: start ? parseDate(start) : undefined,
-            end: end ? parseDate(end) : undefined,
-        };
-    }
-    datePickerOpen.value = open;
+function setPickerOpen(field: DateField, open: boolean) {
+    if (open) openField.value = field;
+    else if (openField.value === field) openField.value = null;
 }
 
-function setOngoing(next: boolean) {
-    if (next === ongoing.value) return;
-    if (ongoing.value) {
-        draftDates.value = {
-            start: ongoingStart.value,
-            end:
-                draftDates.value.start?.toString() === ongoingStart.value?.toString()
-                    ? draftDates.value.end
-                    : undefined,
-        };
-    } else {
-        ongoingStart.value = draftDates.value.start;
-    }
-    ongoing.value = next;
+function selectDate(field: DateField, value: DateValue | undefined) {
+    if (value) dates.value = { ...dates.value, [field]: value.toString() };
+    openField.value = null;
 }
 
-const canApply = computed(() =>
-    ongoing.value
-        ? Boolean(ongoingStart.value)
-        : Boolean(draftDates.value.start && draftDates.value.end)
-);
-
-function applyTaskDates() {
-    if (!canApply.value) return;
-    dates.value = ongoing.value
-        ? { start_date: ongoingStart.value!.toString(), due_date: null }
-        : {
-              start_date: draftDates.value.start!.toString(),
-              due_date: draftDates.value.end!.toString(),
-          };
-    datePickerOpen.value = false;
-}
-
-function clearTaskDates() {
+function clearDates() {
     dates.value = { start_date: null, due_date: null };
-    datePickerOpen.value = false;
+    openField.value = null;
+}
+
+function setOngoing() {
+    dates.value = { ...dates.value, due_date: null };
+    openField.value = null;
 }
 </script>
 
 <template>
-    <Field>
-        <FieldLabel :for="triggerId" :icon="CalendarDaysIcon">Task dates</FieldLabel>
-        <Popover :open="datePickerOpen" @update:open="updateDatePickerOpen">
-            <PopoverTrigger as-child>
-                <Button
-                    :id="triggerId"
-                    type="button"
-                    variant="input"
-                    class="w-full justify-between">
-                    <span class="flex min-w-0 items-center gap-2">
-                        <CalendarIcon class="size-4 shrink-0 text-icon-default" />
-                        <span
-                            class="truncate tabular-nums"
-                            :class="{ 'text-text-tertiary': !dates.start_date }">
-                            {{ dateRangeLabel }}
-                        </span>
-                    </span>
-                    <ChevronDown class="size-4 shrink-0 text-icon-default" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" class="w-auto p-0">
-                <div class="border-b border-border px-3 py-2.5">
-                    <div
-                        role="group"
-                        :aria-label="t('Task dates')"
-                        class="grid grid-cols-2 gap-1 rounded-lg bg-tertiary p-1">
-                        <button
-                            v-for="mode in [false, true]"
-                            :key="String(mode)"
-                            type="button"
-                            :aria-pressed="ongoing === mode"
-                            class="rounded-md px-2 py-1.5 text-xs font-medium text-text-secondary hover:text-text-primary focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-text-secondary aria-pressed:bg-default-background aria-pressed:text-text-primary aria-pressed:shadow-sm"
-                            @click="setOngoing(mode)">
-                            {{ t(mode ? 'Ongoing' : 'Date range') }}
-                        </button>
-                    </div>
-                    <p v-if="ongoing" class="mt-2 text-xs text-text-secondary">
-                        {{ t('Select a start date. No due date is needed.') }}
-                    </p>
-                </div>
-                <Calendar
-                    v-if="ongoing"
-                    v-model="ongoingStart"
-                    prevent-deselect
-                    initial-focus
-                    :week-starts-on="weekStartsOn" />
-                <RangeCalendar
-                    v-else
-                    v-model="draftDates"
-                    class="task-date-calendar"
-                    initial-focus
-                    :week-starts-on="weekStartsOn" />
-                <div class="flex items-center justify-between border-t border-border px-3 py-2.5">
+    <div class="grid min-w-0 grid-cols-2 gap-x-4 gap-y-2">
+        <Field v-for="field in fields" :key="field.name" class="min-w-0">
+            <FieldLabel :for="id + field.name">{{ t(field.label) }}</FieldLabel>
+            <Popover
+                :open="openField === field.name"
+                @update:open="setPickerOpen(field.name, $event)">
+                <PopoverTrigger as-child>
                     <Button
+                        :id="id + field.name"
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        :disabled="!dates.start_date && !draftDates.start && !ongoingStart"
-                        @click="clearTaskDates">
-                        Clear
+                        variant="input"
+                        class="w-full justify-between gap-1"
+                        :aria-invalid="
+                            Boolean(error) && field.name === 'due_date' ? true : undefined
+                        "
+                        :aria-describedby="
+                            error && field.name === 'due_date' ? errorId : undefined
+                        ">
+                        <span class="flex min-w-0 items-center gap-1.5">
+                            <CalendarIcon class="size-4 shrink-0 text-icon-default" />
+                            <span
+                                class="truncate tabular-nums"
+                                :class="{ 'text-text-tertiary': !dates[field.name] }">
+                                {{
+                                    dates[field.name]
+                                        ? formatDate(dates[field.name]!, organization?.date_format)
+                                        : field.name === 'due_date' && dates.start_date
+                                          ? t('Ongoing')
+                                          : t('Pick a date')
+                                }}
+                            </span>
+                        </span>
+                        <ChevronDown class="size-4 shrink-0 text-icon-default" />
                     </Button>
-                    <Button type="button" size="sm" :disabled="!canApply" @click="applyTaskDates">
-                        Apply
-                    </Button>
-                </div>
-            </PopoverContent>
-        </Popover>
-    </Field>
+                </PopoverTrigger>
+                <PopoverContent align="start" class="w-auto p-0">
+                    <Calendar
+                        initial-focus
+                        :model-value="calendarDates[field.name]"
+                        :week-starts-on="weekStartsOn"
+                        @update:model-value="selectDate(field.name, $event)" />
+                    <div
+                        v-if="dates.start_date || dates.due_date"
+                        class="border-t border-border p-2">
+                        <Button
+                            v-if="field.name === 'start_date'"
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            @click="clearDates">
+                            {{ t('Clear dates') }}
+                        </Button>
+                        <Button
+                            v-else-if="dates.start_date"
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            @click="setOngoing">
+                            {{ t('Ongoing · No due date') }}
+                        </Button>
+                    </div>
+                </PopoverContent>
+            </Popover>
+        </Field>
+        <p
+            v-if="error"
+            :id="errorId"
+            role="alert"
+            class="col-span-2 text-xs text-red-600 dark:text-red-400">
+            {{ t(error) }}
+        </p>
+    </div>
 </template>
-
-<style scoped>
-.task-date-calendar :deep([data-selection-start]),
-.task-date-calendar :deep([data-selection-end]) {
-    background-image: linear-gradient(var(--endpoint-color), var(--endpoint-color));
-    background-position: bottom;
-    background-size: 100% 3px;
-    background-repeat: no-repeat;
-}
-.task-date-calendar :deep([data-selection-start]) {
-    --endpoint-color: #0ea5e9;
-}
-.task-date-calendar :deep([data-selection-end]) {
-    --endpoint-color: #f59e0b;
-}
-.task-date-calendar :deep([data-selection-start][data-selection-end]) {
-    background-image: linear-gradient(90deg, #0ea5e9 50%, #f59e0b 50%);
-}
-</style>

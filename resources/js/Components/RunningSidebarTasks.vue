@@ -24,7 +24,7 @@ const runningTasks = computed(() => {
     <section
         v-if="runningTasks.length"
         aria-labelledby="running-tasks-heading"
-        class="mt-2 border-t border-default-background-separator px-2 pb-3 pt-2.5">
+        class="mt-2 border-t border-default-background-separator px-2 pb-4 pt-2.5">
         <h2 id="running-tasks-heading" class="mb-1 px-1 text-xs font-medium text-text-secondary">
             {{ t('Running tasks') }}
         </h2>

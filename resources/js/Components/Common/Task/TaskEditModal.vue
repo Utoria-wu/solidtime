@@ -2,7 +2,7 @@
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import { useFocus } from '@vueuse/core';
 import { useTasksStore } from '@/utils/useTasks';
@@ -10,7 +10,7 @@ import type { Task, UpdateTaskBody } from '@/packages/api/src';
 import TimeEntryNotesField from '@/packages/ui/src/TimeEntry/TimeEntryNotesField.vue';
 import TaskCategoryField from './TaskCategoryField.vue';
 import TaskStageField from './TaskStageField.vue';
-import TaskDatesField from './TaskDatesField.vue';
+import TaskDatesField, { getTaskDateError } from './TaskDatesField.vue';
 import EstimatedTimeSection from '@/packages/ui/src/EstimatedTimeSection.vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { Field, FieldGroup, FieldLabel } from '@/packages/ui/src/field';
@@ -48,8 +48,10 @@ watch(show, (open) => {
     };
 });
 
+const taskDatesError = computed(() => getTaskDateError(taskDates.value));
+
 async function submit() {
-    if (saving.value) return;
+    if (saving.value || taskDatesError.value) return;
     saving.value = true;
     try {
         const result = await updateTask(props.task.id, {
@@ -93,8 +95,8 @@ useFocus(taskNameInput, { initialValue: true });
                         autocomplete="off"
                         @keydown.enter="submit()" />
                 </Field>
-                <div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
-                    <TaskDatesField v-model="taskDates" />
+                <div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-3">
+                    <TaskDatesField v-model="taskDates" class="sm:col-span-2" />
                     <EstimatedTimeSection
                         v-if="isAllowedToPerformPremiumAction()"
                         v-model="taskBody.estimated_time"
@@ -112,7 +114,7 @@ useFocus(taskNameInput, { initialValue: true });
             <PrimaryButton
                 class="ms-3"
                 :class="{ 'opacity-25': saving }"
-                :disabled="saving"
+                :disabled="saving || Boolean(taskDatesError)"
                 @click="submit">
                 Update Task
             </PrimaryButton>
