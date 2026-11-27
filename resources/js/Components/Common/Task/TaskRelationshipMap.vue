@@ -200,7 +200,7 @@ function relationshipText(edge: TaskRelationship) {
     grid-template-columns: repeat(var(--columns), minmax(9rem, 1fr));
     gap: 4.75rem;
     min-width: calc(var(--columns) * 13.75rem - 4.75rem);
-    max-width: 68rem;
+    max-width: min(68rem, calc(var(--columns) * 18rem + (var(--columns) - 1) * 4.75rem));
     padding-block: 0.2rem;
 }
 .relationship-column {
