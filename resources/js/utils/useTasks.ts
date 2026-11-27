@@ -47,6 +47,11 @@ export const useTasksStore = defineStore('tasks', () => {
                 'Failed to create task'
             );
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            if (result && task.relationship) {
+                void queryClient.invalidateQueries({
+                    queryKey: ['taskRelationships', organizationId],
+                });
+            }
             return result;
         }
     }

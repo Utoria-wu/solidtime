@@ -33,6 +33,8 @@ vi.mock('@/utils/useTaskHistory', () => ({
 vi.mock('@/utils/useTaskRelationships', () => ({
     useTaskRelationships: () => ({ relationships: ref([]), isError: ref(false) }),
 }));
+vi.mock('@/utils/useTasksQuery', () => ({ useTasksQuery: () => ({ tasks: ref([]) }) }));
+vi.mock('@/utils/useProjectsQuery', () => ({ useProjectsQuery: () => ({ projects: ref([]) }) }));
 
 function calendarEntry(overrides: Partial<TimeEntry>): TimeEntry {
     return {

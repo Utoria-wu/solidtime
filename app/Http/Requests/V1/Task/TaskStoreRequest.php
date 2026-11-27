@@ -8,6 +8,7 @@ use App\Http\Requests\V1\BaseFormRequest;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskRelationship;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rule;
@@ -48,6 +49,9 @@ class TaskStoreRequest extends BaseFormRequest
             'category_id' => ['nullable', 'uuid', Rule::exists('task_categories', 'id')->where('organization_id', $this->organization->id)->whereNull('archived_at')],
             'stage' => ['nullable', 'string', 'max:100'],
             'markdown_notes' => ['nullable', 'string', 'max:10000'],
+            'relationship' => ['sometimes', 'required', 'array:related_task_id,kind'],
+            'relationship.related_task_id' => ['required_with:relationship', 'uuid'],
+            'relationship.kind' => ['required_with:relationship', Rule::in(TaskRelationship::KINDS)],
             'start_date' => ['present_with:due_date', 'required_with:due_date', 'nullable', 'date_format:Y-m-d'],
             'due_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             // Estimated time in seconds

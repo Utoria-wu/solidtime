@@ -17,6 +17,7 @@ use App\Models\Task;
 use App\Models\TaskHistoryEntry;
 use App\Models\TaskRelationship;
 use App\Models\TaskTimerSession;
+use App\Service\TaskRelationshipService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -101,7 +102,7 @@ class TaskController extends Controller
      *
      * @operationId createTask
      */
-    public function store(Organization $organization, TaskStoreRequest $request): JsonResource
+    public function store(Organization $organization, TaskStoreRequest $request, TaskRelationshipService $relationships): JsonResource
     {
         /** @var Project $project */
         $project = Project::query()->findOrFail($request->input('project_id'));
@@ -124,11 +125,27 @@ class TaskController extends Controller
             $task->estimated_time = $request->getEstimatedTime();
         }
         $task->organization()->associate($organization);
-        DB::transaction(function () use ($task, $project): void {
+        $relationship = $request->validated('relationship');
+        $task = DB::transaction(function () use ($organization, $task, $project, $relationship, $relationships): Task {
+            $newTask = clone $task;
+            if ($relationship !== null) {
+                $this->checkAnyPermission($organization, ['tasks:view', 'tasks:view:all']);
+                $relationships->lockGraph($organization);
+                $relatedTask = $relationships->visibleTasks($organization, $this->user(), $this->hasPermission($organization, 'tasks:view:all'))
+                    ->whereKey($relationship['related_task_id'])->lockForUpdate()->first();
+                if (! $relatedTask) {
+                    throw ValidationException::withMessages(['relationship.related_task_id' => 'Choose a task from a project you can view.']);
+                }
+            }
             $lockedProject = Project::query()->lockForUpdate()->findOrFail($project->id);
-            $this->ensureUniqueName($lockedProject, $task);
-            $task->save();
-        });
+            $this->ensureUniqueName($lockedProject, $newTask);
+            $newTask->save();
+            if (isset($relatedTask)) {
+                $relationships->link($newTask, $relatedTask, $relationship['kind']);
+            }
+
+            return $newTask;
+        }, attempts: 3);
 
         return new TaskResource($task);
     }
@@ -218,7 +235,7 @@ class TaskController extends Controller
         $hasRelationships = TaskRelationship::query()
             ->where('task_id', $task->id)->orWhere('related_task_id', $task->id)->exists();
         if ($hasRelationships) {
-            throw ValidationException::withMessages(['project_id' => 'This task is linked to another task in its current project. Remove the links before moving it.']);
+            throw ValidationException::withMessages(['project_id' => 'This task is linked to another task. Remove the links before moving it.']);
         }
         $hasPendingTimer = TaskTimerSession::query()->where('task_id', $task->id)->get()
             ->contains(fn (TaskTimerSession $session): bool => $session->started_at !== null || $session->segments !== []);
