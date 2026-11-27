@@ -16,12 +16,19 @@ vi.mock('@/utils/permissions', () => ({
     canCreateTags: () => false,
     canUpdateTags: () => false,
     canUpdateTasks: () => false,
+    canUpdateAllTasks: () => false,
+    canUpdateTimeEntry: (member: string, currentMember: string) => member === currentMember,
     canViewAllTimeEntries: () => false,
 }));
 vi.mock('@/utils/useTaskHistory', () => ({
     historyKinds: {},
     useTaskCategories: () => ({ categories: ref([]), isError: ref(false) }),
-    useTaskHistory: () => ({ entries: ref([]), isPending: ref(false), isError: ref(false) }),
+    useTaskHistory: () => ({
+        entries: ref([]),
+        isPending: ref(false),
+        isError: ref(false),
+        classify: vi.fn(),
+    }),
 }));
 vi.mock('@/utils/useTaskRelationships', () => ({
     useTaskRelationships: () => ({ relationships: ref([]), isError: ref(false) }),
@@ -39,6 +46,7 @@ function calendarEntry(overrides: Partial<TimeEntry>): TimeEntry {
         task_id: null,
         organization_id: 'organization-1',
         user_id: 'user-1',
+        member_id: 'member-1',
         tags: [],
         billable: false,
         type: 'work',

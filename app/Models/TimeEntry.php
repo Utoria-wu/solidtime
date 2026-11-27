@@ -26,6 +26,7 @@ use Staudenmeir\EloquentJsonRelations\Relations\BelongsToJson;
  * @property string $id
  * @property string $description
  * @property string|null $markdown_notes
+ * @property array{category_id?: string|null, stage?: string|null}|null $history_classification
  * @property Carbon $start
  * @property Carbon|null $end
  * @property int|null $billable_rate Billable rate per hour in cents
@@ -77,6 +78,7 @@ class TimeEntry extends Model implements AuditableContract
         'billable' => 'bool',
         'type' => TimeEntryType::class,
         'tags' => 'array',
+        'history_classification' => 'array',
         'billable_rate' => 'int',
         'is_imported' => 'bool',
         'still_active_email_sent_at' => 'datetime',
@@ -93,6 +95,7 @@ class TimeEntry extends Model implements AuditableContract
         'id',
         'description',
         'markdown_notes',
+        'history_classification',
         'start',
         'end',
         'billable_rate',

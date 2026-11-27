@@ -14,6 +14,71 @@ use Laravel\Passport\Passport;
 
 class TaskHistoryEndpointTest extends ApiEndpointTestAbstract
 {
+    public function test_classifies_task_and_standalone_calendar_activity_in_one_request(): void
+    {
+        $data = $this->createUserWithRole(Role::Owner);
+        Passport::actingAs($data->user);
+        $project = Project::factory()->forOrganization($data->organization)->create();
+        $task = Task::factory()->forOrganization($data->organization)->for($project)->create(['stage' => 'Discovery']);
+        $entry = TimeEntry::factory()->forOrganization($data->organization)->for($project)->create([
+            'user_id' => $data->user->id,
+            'member_id' => $data->member->id,
+            'task_id' => null,
+            'description' => 'Review incident notes',
+            'markdown_notes' => '## Follow-up',
+        ]);
+        $category = TaskCategory::query()->create([
+            'organization_id' => $data->organization->id,
+            'name' => 'Review',
+            'color' => '#5389b0',
+        ]);
+        $base = '/api/v1/organizations/'.$data->organization->id;
+        $url = $base.'/projects/'.$project->id.'/history';
+        $this->patchJson($url, [
+            'task_ids' => [$task->id],
+            'time_entry_ids' => [$entry->id],
+            'changes' => ['category_id' => $category->id],
+        ])->assertOk()->assertJsonPath('data.tasks', 1)->assertJsonPath('data.calendar_entries', 1);
+        $this->assertSame($category->id, $task->refresh()->category_id);
+        $this->assertSame('Discovery', $task->stage);
+        $this->getJson($base.'/time-entries?project_ids[]='.$project->id)
+            ->assertOk()
+            ->assertJsonPath('data.0.member_id', $data->member->id)
+            ->assertJsonPath('data.0.history_classification.category_id', $category->id);
+
+        $this->patchJson($url, [
+            'time_entry_ids' => [$entry->id],
+            'changes' => ['category_id' => null, 'stage' => 'Verification'],
+        ])->assertOk();
+        $this->assertSame(['category_id' => null, 'stage' => 'Verification'], $entry->refresh()->history_classification);
+        $this->assertSame('## Follow-up', $entry->markdown_notes);
+        $this->assertNull($entry->task_id);
+        $this->assertSame($category->id, $task->refresh()->category_id);
+    }
+
+    public function test_history_classification_rolls_back_when_a_selected_entry_cannot_be_updated(): void
+    {
+        $data = $this->createUserWithPermission(['tasks:view', 'tasks:update', 'time-entries:update:own']);
+        Passport::actingAs($data->user);
+        $project = Project::factory()->forOrganization($data->organization)->create(['is_public' => true]);
+        $task = Task::factory()->forOrganization($data->organization)->for($project)->create(['stage' => 'Discovery']);
+        $entry = TimeEntry::factory()->forOrganization($data->organization)->for($project)->create([
+            'user_id' => $data->owner->id,
+            'member_id' => $data->ownerMember->id,
+        ]);
+        $url = '/api/v1/organizations/'.$data->organization->id.'/projects/'.$project->id.'/history';
+        $changes = ['task_ids' => [$task->id], 'time_entry_ids' => [$entry->id], 'changes' => ['stage' => 'Delivery']];
+        $this->patchJson($url, $changes)->assertForbidden();
+        $this->assertSame('Discovery', $task->refresh()->stage);
+        $this->assertNull($entry->refresh()->history_classification);
+
+        $otherProject = Project::factory()->forOrganization($data->organization)->create();
+        $entry->project()->associate($otherProject);
+        $entry->save();
+        $this->patchJson($url, $changes)->assertUnprocessable();
+        $this->assertSame('Discovery', $task->refresh()->stage);
+    }
+
     public function test_all_task_scope_can_access_history_without_project_membership(): void
     {
         $data = $this->createUserWithPermission(['tasks:view:all', 'tasks:update:all']);

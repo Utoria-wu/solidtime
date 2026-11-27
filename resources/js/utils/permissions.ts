@@ -45,6 +45,22 @@ export function canUpdateTasks() {
     return currentUserHasPermission('tasks:update');
 }
 
+export function canUpdateAllTasks() {
+    return currentUserHasPermission('tasks:update:all');
+}
+
+export function canUpdateTimeEntry(
+    memberId: string | undefined,
+    currentMemberId: string | undefined
+) {
+    return (
+        currentUserHasPermission('time-entries:update:all') ||
+        (memberId !== undefined &&
+            memberId === currentMemberId &&
+            currentUserHasPermission('time-entries:update:own'))
+    );
+}
+
 export function canCreateOwnTimeEntries() {
     return currentUserHasPermission('time-entries:create:own');
 }

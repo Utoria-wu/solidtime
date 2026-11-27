@@ -772,11 +772,19 @@ const TimeEntryResource = z
         end: z.union([z.string(), z.null()]),
         duration: z.union([z.number(), z.null()]),
         markdown_notes: z.union([z.string(), z.null()]).optional(),
+        history_classification: z
+            .object({
+                category_id: z.string().nullable().optional(),
+                stage: z.string().nullable().optional(),
+            })
+            .nullable()
+            .optional(),
         description: z.union([z.string(), z.null()]),
         task_id: z.union([z.string(), z.null()]),
         project_id: z.union([z.string(), z.null()]),
         organization_id: z.string(),
         user_id: z.string(),
+        member_id: z.string().optional(),
         tags: z.array(z.string()),
         billable: z.boolean(),
         type: TimeEntryType,

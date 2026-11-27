@@ -187,6 +187,7 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
             Route::put('/task-categories/{category}', [TaskCategoryController::class, 'update'])->middleware('check-organization-blocked')->name('task-categories.update');
             Route::get('/projects/{project}/history', [TaskHistoryController::class, 'index'])->name('projects.history.index');
             Route::post('/projects/{project}/history', [TaskHistoryController::class, 'store'])->middleware('check-organization-blocked')->name('projects.history.store');
+            Route::patch('/projects/{project}/history', [TaskHistoryController::class, 'classify'])->middleware('check-organization-blocked')->name('projects.history.classify');
             Route::put('/projects/{project}/history/{entry}', [TaskHistoryController::class, 'update'])->middleware('check-organization-blocked')->name('projects.history.update');
             Route::delete('/projects/{project}/history/{entry}', [TaskHistoryController::class, 'destroy'])->middleware('check-organization-blocked')->name('projects.history.destroy');
             Route::get('/projects/{project}/task-relationships', [TaskRelationshipController::class, 'index'])->name('projects.task-relationships.index');
