@@ -44,6 +44,55 @@ class TaskHistoryController extends Controller
         return $this->save($organization, $project, new TaskHistoryEntry, $request, 201);
     }
 
+    public function classify(Organization $organization, Project $project, Request $request): JsonResponse
+    {
+        $this->authorizeProject($organization, $project, 'tasks:view');
+        $input = $request->validate([
+            'task_ids' => ['required_without:time_entry_ids', 'array', 'list'],
+            'task_ids.*' => ['uuid', 'distinct:ignore_case'],
+            'time_entry_ids' => ['required_without:task_ids', 'array', 'list'],
+            'time_entry_ids.*' => ['uuid', 'distinct:ignore_case'],
+            'changes' => ['required', 'array:category_id,stage', 'min:1'],
+            'changes.category_id' => ['nullable', 'uuid', Rule::exists('task_categories', 'id')
+                ->where('organization_id', $organization->id)->whereNull('archived_at')],
+            'changes.stage' => ['nullable', 'string', 'max:100'],
+        ]);
+        $taskIds = $input['task_ids'] ?? [];
+        $entryIds = $input['time_entry_ids'] ?? [];
+        $changes = $input['changes'];
+        if ($taskIds !== []) {
+            $this->authorizeProject($organization, $project, 'tasks:update');
+        }
+        if ($entryIds !== []) {
+            $this->checkAnyPermission($organization, ['time-entries:update:own', 'time-entries:update:all']);
+        }
+        $canUpdateAllEntries = $this->hasPermission($organization, 'time-entries:update:all');
+
+        DB::transaction(function () use ($organization, $project, $taskIds, $entryIds, $changes, $canUpdateAllEntries): void {
+            if ($taskIds !== []) {
+                $tasks = Task::query()->whereBelongsTo($project)->where('organization_id', $organization->id)
+                    ->whereKey($taskIds)->orderBy('id')->lockForUpdate()->get();
+                abort_unless($tasks->count() === count($taskIds), 422, 'Some tasks are no longer in this project.');
+                foreach ($tasks as $task) {
+                    $task->forceFill($changes)->save();
+                }
+            }
+            if ($entryIds !== []) {
+                $entries = TimeEntry::query()->whereBelongsTo($project)->where('organization_id', $organization->id)
+                    ->whereNotNull('end')->whereKey($entryIds)->orderBy('id')->lockForUpdate()->get();
+                abort_unless($entries->count() === count($entryIds), 422, 'Some Calendar entries are no longer in this project.');
+                $memberId = $this->member($organization)->id;
+                foreach ($entries as $entry) {
+                    abort_unless($canUpdateAllEntries || $entry->member_id === $memberId, 403);
+                    $entry->history_classification = array_replace($entry->history_classification ?? [], $changes);
+                    $entry->save();
+                }
+            }
+        }, attempts: 3);
+
+        return response()->json(['data' => ['tasks' => count($taskIds), 'calendar_entries' => count($entryIds)]]);
+    }
+
     public function update(Organization $organization, Project $project, TaskHistoryEntry $entry, Request $request): JsonResponse
     {
         $this->authorizeProject($organization, $project, 'tasks:update');

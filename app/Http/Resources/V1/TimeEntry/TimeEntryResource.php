@@ -7,6 +7,7 @@ namespace App\Http\Resources\V1\TimeEntry;
 use App\Http\Resources\V1\BaseResource;
 use App\Models\TimeEntry;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\MissingValue;
 
 /**
  * @property TimeEntry $resource
@@ -16,7 +17,7 @@ class TimeEntryResource extends BaseResource
     /**
      * Transform the resource into an array.
      *
-     * @return array<string, string|bool|int|null|array<string>>
+     * @return array<string, string|bool|int|null|array<string|null>|MissingValue>
      */
     public function toArray(Request $request): array
     {
@@ -37,6 +38,8 @@ class TimeEntryResource extends BaseResource
             'description' => $this->resource->description,
             /** Optional notes in Markdown */
             'markdown_notes' => $this->resource->markdown_notes,
+            /** History classification overrides. Missing keys inherit from the linked task. */
+            'history_classification' => $this->whenHas('history_classification'),
             /** ID of task */
             'task_id' => $this->resource->task_id,
             /** ID of project */
@@ -45,6 +48,8 @@ class TimeEntryResource extends BaseResource
             'organization_id' => $this->resource->organization_id,
             /** ID of user */
             'user_id' => $this->resource->user_id,
+            /** ID of member */
+            'member_id' => $this->whenHas('member_id'),
             /** List of tag IDs */
             'tags' => $this->resource->tags ?? [],
             /** Whether time entry is billable */

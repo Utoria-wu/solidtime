@@ -5,6 +5,7 @@ import {
     AdjustmentsHorizontalIcon,
     ArrowLeftIcon,
     ChevronRightIcon,
+    CheckCircleIcon,
     MagnifyingGlassIcon,
 } from '@heroicons/vue/20/solid';
 import { api, type Task, type TimeEntry } from '@/packages/api/src';
@@ -14,12 +15,15 @@ import { historyKinds, useTaskCategories, useTaskHistory } from '@/utils/useTask
 import { useTaskRelationships } from '@/utils/useTaskRelationships';
 import {
     canCreateTags,
+    canUpdateAllTasks,
     canUpdateTags,
     canUpdateTasks,
+    canUpdateTimeEntry,
     canViewAllTimeEntries,
 } from '@/utils/permissions';
 import { getCurrentMembershipId, getCurrentOrganizationId } from '@/utils/useUser';
 import ProjectHistoryTimeline, { type ProjectHistoryRecord } from './ProjectHistoryTimeline.vue';
+import HistoryBulkEditModal from './HistoryBulkEditModal.vue';
 import TaskRelationshipMap from './TaskRelationshipMap.vue';
 import TaskCategoryManager from './TaskCategoryManager.vue';
 import TaskEditModal from './TaskEditModal.vue';
@@ -46,8 +50,11 @@ const category = ref<string | null>(null);
 const activityType = ref('all');
 const oldestFirst = ref(false);
 const filtersOpen = ref(false);
+const selecting = ref(false);
+const selection = ref(new Set<string>());
+const showBulkEdit = ref(false);
 const canManageCategories = computed(
-    () => view.value === 'tasks' && (canCreateTags() || canUpdateTags())
+    () => view.value !== 'problems' && (canCreateTags() || canUpdateTags())
 );
 const filterCount = computed(
     () =>
@@ -65,7 +72,10 @@ const activeTask = computed(() => taskMap.value.get(selectedTaskId.value ?? ''))
 const stages = computed(() =>
     [
         ...new Set(
-            props.tasks.map((task) => task.stage).filter((value): value is string => Boolean(value))
+            [
+                ...props.tasks.map((task) => task.stage),
+                ...(view.value === 'timeline' ? records.value.map((record) => record.stage) : []),
+            ].filter((value): value is string => Boolean(value))
         ),
     ].sort()
 );
@@ -122,6 +132,8 @@ const records = computed(() => {
                 label: 'Created',
                 note: task.markdown_notes ?? null,
                 color: '#5389b0',
+                categoryId: task.category_id ?? null,
+                stage: task.stage ?? null,
             });
         if (task.done_at)
             result.push({
@@ -133,11 +145,14 @@ const records = computed(() => {
                 label: 'Completed',
                 note: task.completion_notes ?? null,
                 color: '#4e936d',
+                categoryId: task.category_id ?? null,
+                stage: task.stage ?? null,
             });
     }
     for (const event of calendar.data.value ?? []) {
         if (!event.end) continue;
         const task = (event.task_id && taskMap.value.get(event.task_id)) || null;
+        const classification = event.history_classification ?? {};
         result.push({
             id: event.id,
             task,
@@ -148,6 +163,13 @@ const records = computed(() => {
             note: event.markdown_notes ?? null,
             color: '#789487',
             calendarUrl: calendarUrl(event.id, event.start),
+            timeEntry: event,
+            categoryId:
+                classification.category_id === undefined
+                    ? (task?.category_id ?? null)
+                    : classification.category_id,
+            stage:
+                classification.stage === undefined ? (task?.stage ?? null) : classification.stage,
         });
     }
     for (const entry of legacy.entries.value) {
@@ -163,11 +185,16 @@ const records = computed(() => {
             label: kind.label,
             note: entry.markdown_notes,
             color: kind.color,
+            categoryId: task.category_id ?? null,
+            stage: task.stage ?? null,
             legacy: entry,
             calendarUrl: entry.source
                 ? calendarUrl(entry.source.id, entry.source.start)
                 : undefined,
         });
+    }
+    for (const record of result) {
+        if (record.categoryId) record.category = categoryMap.value.get(record.categoryId);
     }
     return result.sort(
         (a, b) => Date.parse(b.date) - Date.parse(a.date) || a.id.localeCompare(b.id)
@@ -209,15 +236,69 @@ function matchesSearch(...values: (string | null | undefined)[]) {
 const timeline = computed(() => {
     const filtered = records.value.filter((record) => {
         if (
-            !matchesFilters(record.task) ||
-            !matchesSearch(record.title, record.task?.name, record.note, record.label)
+            (stage.value !== null && (record.stage ?? '') !== stage.value) ||
+            (category.value !== null && (record.categoryId ?? '') !== category.value) ||
+            !matchesSearch(
+                record.title,
+                record.task?.name,
+                record.note,
+                record.label,
+                record.category?.name,
+                record.stage
+            )
         )
             return false;
-        if (activityType.value === 'unlinked') return record.type === 'calendar' && !record.task;
+        if (activityType.value === 'unlinked')
+            return record.type === 'calendar' && !record.timeEntry?.task_id;
         if (activityType.value === 'calendar') return record.type === 'calendar';
         return true;
     });
     return oldestFirst.value ? filtered.reverse() : filtered;
+});
+const selectable = computed(() =>
+    timeline.value.filter((record) =>
+        record.timeEntry
+            ? canUpdateTimeEntry(record.timeEntry.member_id, getCurrentMembershipId())
+            : record.task && (canUpdateTasks() || canUpdateAllTasks())
+    )
+);
+const selectableIds = computed(() => new Set(selectable.value.map((record) => record.id)));
+const selectedRecords = computed(() =>
+    selectable.value.filter((record) => selection.value.has(record.id))
+);
+const selectedTaskIds = computed(() => [
+    ...new Set(
+        selectedRecords.value.flatMap((record) =>
+            !record.timeEntry && record.task ? [record.task.id] : []
+        )
+    ),
+]);
+const selectedTimeEntryIds = computed(() =>
+    selectedRecords.value.flatMap((record) => (record.timeEntry ? [record.timeEntry.id] : []))
+);
+const allSelected = computed(
+    () => selectable.value.length > 0 && selectedRecords.value.length === selectable.value.length
+);
+
+function stopSelecting() {
+    selecting.value = false;
+    selection.value.clear();
+}
+
+function toggleSelected(id: string) {
+    if (!selectableIds.value.has(id)) return;
+    if (selection.value.has(id)) selection.value.delete(id);
+    else selection.value.add(id);
+}
+
+function toggleVisibleSelection() {
+    selection.value = allSelected.value ? new Set() : new Set(selectableIds.value);
+}
+
+watch(selectableIds, (ids) => {
+    for (const id of selection.value) {
+        if (!ids.has(id)) selection.value.delete(id);
+    }
 });
 const taskList = computed(() =>
     props.tasks.filter(
@@ -293,6 +374,7 @@ const historyError = computed(
 const detailTask = computed(() => activeTask.value ?? activeProblem.value?.task);
 
 function selectView(next: HistoryView) {
+    stopSelecting();
     view.value = next;
     filtersOpen.value = false;
     selectedTaskId.value = null;
@@ -306,6 +388,7 @@ function clearFilters() {
 }
 
 function selectTask(task: Task) {
+    stopSelecting();
     selectedTaskId.value = task.id;
     selectedProblemId.value = null;
 }
@@ -463,6 +546,45 @@ watch(editingTask, (task) => {
                             </button>
                         </PopoverContent>
                     </Popover>
+                    <template v-if="view === 'timeline'">
+                        <button
+                            v-if="!selecting && selectable.length"
+                            type="button"
+                            class="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-text-secondary hover:bg-tertiary"
+                            @click="selecting = true">
+                            <CheckCircleIcon class="size-4" aria-hidden="true" />
+                            Select events
+                        </button>
+                        <div
+                            v-else-if="selecting"
+                            class="flex flex-wrap items-center gap-2 border-l border-row-separator pl-2">
+                            <span
+                                aria-live="polite"
+                                class="text-xs tabular-nums text-text-secondary">
+                                {{ selectedRecords.length }} selected
+                            </span>
+                            <button
+                                type="button"
+                                :disabled="!selectable.length"
+                                class="rounded-md px-2 py-1.5 text-sm text-text-secondary hover:bg-tertiary disabled:opacity-50"
+                                @click="toggleVisibleSelection">
+                                {{ allSelected ? 'Clear selection' : 'Select visible' }}
+                            </button>
+                            <button
+                                type="button"
+                                :disabled="!selectedRecords.length"
+                                class="rounded-md bg-tertiary px-2.5 py-1.5 text-sm font-medium text-text-primary hover:underline disabled:opacity-50"
+                                @click="showBulkEdit = true">
+                                Edit selected
+                            </button>
+                            <button
+                                type="button"
+                                class="rounded-md px-2 py-1.5 text-sm text-text-secondary hover:bg-tertiary"
+                                @click="stopSelecting">
+                                Done
+                            </button>
+                        </div>
+                    </template>
                 </template>
                 <slot name="actions" />
             </div>
@@ -544,7 +666,12 @@ watch(editingTask, (task) => {
         </template>
 
         <template v-else-if="view === 'timeline'">
-            <ProjectHistoryTimeline :records="timeline" @select-task="selectTask" />
+            <ProjectHistoryTimeline
+                :records="timeline"
+                :selectable-ids="selecting ? selectableIds : undefined"
+                :selected-ids="selection"
+                @toggle-selection="toggleSelected"
+                @select-task="selectTask" />
             <p v-if="!timeline.length && !historyError" class="history-empty">
                 {{ loading ? 'Loading activity…' : 'No activity matches this view.' }}
             </p>
@@ -614,6 +741,14 @@ watch(editingTask, (task) => {
             </p>
         </template>
     </div>
+    <HistoryBulkEditModal
+        v-model:show="showBulkEdit"
+        :task-ids="selectedTaskIds"
+        :time-entry-ids="selectedTimeEntryIds"
+        :categories="categories"
+        :stages="stages"
+        :save="legacy.classify"
+        @saved="stopSelecting" />
     <TaskEditModal
         v-if="editingTask"
         :key="editingTask.id"

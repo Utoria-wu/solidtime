@@ -3,8 +3,8 @@ import { computed, ref } from 'vue';
 import { ArrowTopRightOnSquareIcon } from '@heroicons/vue/20/solid';
 import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import { renderNotes } from '@/packages/ui/src/utils/notes';
-import type { Task } from '@/packages/api/src';
-import type { HistoryEntry } from '@/utils/useTaskHistory';
+import type { Task, TimeEntry } from '@/packages/api/src';
+import type { HistoryEntry, TaskCategory } from '@/utils/useTaskHistory';
 
 export type ProjectHistoryRecord = {
     id: string;
@@ -15,12 +15,21 @@ export type ProjectHistoryRecord = {
     date: string;
     note: string | null;
     color: string;
+    categoryId: string | null;
+    category?: TaskCategory;
+    stage: string | null;
+    timeEntry?: TimeEntry;
     calendarUrl?: string;
     legacy?: HistoryEntry;
 };
 
-const props = defineProps<{ records: ProjectHistoryRecord[]; focused?: boolean }>();
-const emit = defineEmits<{ selectTask: [task: Task] }>();
+const props = defineProps<{
+    records: ProjectHistoryRecord[];
+    focused?: boolean;
+    selectableIds?: Set<string>;
+    selectedIds?: Set<string>;
+}>();
+const emit = defineEmits<{ selectTask: [task: Task]; toggleSelection: [id: string] }>();
 const expanded = ref(new Set<string>());
 const recordIds = computed(() => new Set(props.records.map((record) => record.id)));
 const days = computed(() => {
@@ -59,11 +68,25 @@ function longNote(note: string) {
                 class="history-event"
                 :style="{ '--history-accent': record.color }">
                 <div
-                    class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-text-secondary">
+                    class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
+                    <input
+                        v-if="selectableIds?.has(record.id)"
+                        type="checkbox"
+                        :checked="selectedIds?.has(record.id)"
+                        :aria-label="'Select ' + record.label + ': ' + record.title"
+                        class="size-4 shrink-0 rounded border-input-border bg-card-background text-accent-600 focus:ring-0 focus-visible:ring-2 focus-visible:ring-ring"
+                        @change="emit('toggleSelection', record.id)" />
                     <time class="tabular-nums" :datetime="record.date">{{
                         getLocalizedDayJs(record.date).format('HH:mm')
                     }}</time>
                     <span>{{ record.label }}</span>
+                    <span v-if="record.category" class="inline-flex items-center gap-1.5">
+                        <span
+                            class="size-1.5 rounded-full"
+                            :style="{ backgroundColor: record.category.color }" />
+                        {{ record.category.name }}
+                    </span>
+                    <span v-if="record.stage">{{ record.stage }}</span>
                     <span v-if="record.legacy?.outcome" class="capitalize">{{
                         record.legacy.outcome
                     }}</span>

@@ -37,6 +37,7 @@ export type HistoryEntry = {
     source: { id: string; description: string | null; start: string; end: string | null } | null;
 };
 export type HistoryBody = Omit<HistoryEntry, 'id' | 'author_name' | 'source'>;
+export type HistoryClassification = { category_id?: string | null; stage?: string | null };
 const base = () => `/api/v1/organizations/${getCurrentOrganizationId()}`;
 
 export function useTaskCategories() {
@@ -149,5 +150,29 @@ export function useTaskHistory(projectId: string) {
         void client.invalidateQueries({ queryKey: key.value });
         return result === true;
     }
-    return { ...query, entries: computed(() => query.data.value ?? []), save, remove };
+    async function classify(
+        taskIds: string[],
+        timeEntryIds: string[],
+        changes: HistoryClassification
+    ) {
+        const result = await notifications.handleApiRequestNotifications(
+            () =>
+                request<{ data: { tasks: number; calendar_entries: number } }>({
+                    url: endpoint(),
+                    method: 'patch',
+                    data: { task_ids: taskIds, time_entry_ids: timeEntryIds, changes },
+                }),
+            'History updated',
+            'Could not update selected events'
+        );
+        if (!result) return false;
+        await Promise.all([
+            taskIds.length ? client.invalidateQueries({ queryKey: ['tasks'] }) : undefined,
+            timeEntryIds.length
+                ? client.invalidateQueries({ queryKey: ['timeEntries'] })
+                : undefined,
+        ]);
+        return true;
+    }
+    return { ...query, entries: computed(() => query.data.value ?? []), save, remove, classify };
 }
