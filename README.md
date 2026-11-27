@@ -7,7 +7,7 @@ When work spans projects, a task can link to related work during creation or lat
 ## What changes
 
 - Choose **Select events**, select individual rows or all visible editable rows, and open **Edit selected**.
-- Set or clear **Category** and **Stage** independently. Rows show their classification, and both fields can be used to filter the timeline.
+- Set or clear **Category** and **Stage** independently. Each field keeps its current value until changed. Rows show their classification, and both fields can be used to filter the timeline.
 - Task events share the task's classification. A Calendar entry can store its own classification whether it is linked to a task or stands alone.
 - The server saves the batch in one transaction and checks that each entry belongs to the project and can be edited by the current user.
 - The **Create Task** dialog offers an optional **Link task** section. A task and its initial link are saved together.
