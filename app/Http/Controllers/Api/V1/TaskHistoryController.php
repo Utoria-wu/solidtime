@@ -66,7 +66,7 @@ class TaskHistoryController extends Controller
         ]);
         abort_if($entry->exists && $entry->task_id !== $input['task_id'], 422, 'History records cannot be moved to another task.');
         $entry = DB::transaction(function () use ($organization, $project, $entry, $input): TaskHistoryEntry {
-            Task::query()->whereKey($input['task_id'])->lockForUpdate()->firstOrFail();
+            Task::query()->whereKey($input['task_id'])->whereBelongsTo($project)->lockForUpdate()->firstOrFail();
             if ($entry->exists) {
                 $entry = TaskHistoryEntry::query()->lockForUpdate()->findOrFail($entry->id);
                 abort_unless($entry->version === $input['version'], 422, 'This record changed. Reload it before editing.');
@@ -126,8 +126,8 @@ class TaskHistoryController extends Controller
         $this->authorizeProject($organization, $project, 'tasks:update');
         abort_unless($entry->project_id === $project->id, 404);
         $input = $request->validate(['version' => ['required', 'integer', 'min:0']]);
-        DB::transaction(function () use ($entry, $input): void {
-            Task::query()->whereKey($entry->task_id)->lockForUpdate()->firstOrFail();
+        DB::transaction(function () use ($project, $entry, $input): void {
+            Task::query()->whereKey($entry->task_id)->whereBelongsTo($project)->lockForUpdate()->firstOrFail();
             $locked = TaskHistoryEntry::query()->lockForUpdate()->findOrFail($entry->id);
             abort_unless($locked->version === $input['version'], 422, 'This record changed. Reload it before deleting.');
             abort_if(TaskHistoryEntry::query()->where(fn ($query) => $query->where('parent_id', $entry->id)->orWhere('issue_id', $entry->id))->exists(), 422, 'Relink the dependent records before deleting this record.');

@@ -10,15 +10,19 @@ use App\Http\Requests\V1\Task\TaskStoreRequest;
 use App\Http\Requests\V1\Task\TaskUpdateRequest;
 use App\Http\Resources\V1\Task\TaskCollection;
 use App\Http\Resources\V1\Task\TaskResource;
+use App\Jobs\RecalculateSpentTimeForProject;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\TaskHistoryEntry;
+use App\Models\TaskRelationship;
 use App\Models\TaskTimerSession;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class TaskController extends Controller
 {
@@ -120,7 +124,11 @@ class TaskController extends Controller
             $task->estimated_time = $request->getEstimatedTime();
         }
         $task->organization()->associate($organization);
-        $task->save();
+        DB::transaction(function () use ($task, $project): void {
+            $lockedProject = Project::query()->lockForUpdate()->findOrFail($project->id);
+            $this->ensureUniqueName($lockedProject, $task);
+            $task->save();
+        });
 
         return new TaskResource($task);
     }
@@ -139,12 +147,6 @@ class TaskController extends Controller
             throw new AuthorizationException('Task does not belong to organization');
         }
 
-        if ($this->hasPermission($organization, 'tasks:update:all')) {
-            $this->checkPermission($organization, 'tasks:update:all');
-        } else {
-            $this->checkScopedPermissionForProject($organization, $task->project, 'tasks:update');
-        }
-
         $task->name = $request->input('name');
         if ($this->canAccessPremiumFeatures($organization) && $request->has('estimated_time')) {
             $task->estimated_time = $request->getEstimatedTime();
@@ -161,9 +163,21 @@ class TaskController extends Controller
             $task->start_date = $request->date('start_date', 'Y-m-d');
             $task->due_date = $request->date('due_date', 'Y-m-d');
         }
-        DB::transaction(function () use ($request, &$task): void {
+        DB::transaction(function () use ($organization, $request, &$task): void {
             $lockedTask = Task::query()->lockForUpdate()->findOrFail($task->id);
+            if ($this->hasPermission($organization, 'tasks:update:all')) {
+                $this->checkPermission($organization, 'tasks:update:all');
+            } else {
+                $this->checkScopedPermissionForProject($organization, $lockedTask->project, 'tasks:update');
+            }
             $lockedTask->forceFill($task->getDirty());
+            $destinationId = $request->validated('project_id');
+            if ($destinationId !== null && strtolower($destinationId) !== $lockedTask->project_id) {
+                $this->moveToProject($organization, $lockedTask, $destinationId);
+            } elseif ($lockedTask->isDirty('name')) {
+                $project = Project::query()->lockForUpdate()->findOrFail($lockedTask->project_id);
+                $this->ensureUniqueName($project, $lockedTask);
+            }
             if ($request->boolean('is_canceled')) {
                 abort_if($lockedTask->is_done, 422, 'Reopen the completed task before canceling it.');
                 $sessions = TaskTimerSession::query()->where('task_id', $lockedTask->id);
@@ -182,9 +196,68 @@ class TaskController extends Controller
             }
             $lockedTask->save();
             $task = $lockedTask;
-        });
+        }, attempts: 3);
 
         return new TaskResource($task);
+    }
+
+    private function moveToProject(Organization $organization, Task $task, string $destinationId): void
+    {
+        $source = $task->project;
+        $destination = Project::query()->whereBelongsTo($organization)->lockForUpdate()->findOrFail($destinationId);
+        if ($this->hasPermission($organization, 'tasks:create:all')) {
+            $this->checkPermission($organization, 'tasks:create:all');
+        } else {
+            $this->checkScopedPermissionForProject($organization, $destination, 'tasks:create');
+        }
+
+        if ($destination->is_archived) {
+            throw ValidationException::withMessages(['project_id' => 'Choose an active destination project.']);
+        }
+        $this->ensureUniqueName($destination, $task);
+        $hasRelationships = TaskRelationship::query()
+            ->where('task_id', $task->id)->orWhere('related_task_id', $task->id)->exists();
+        if ($hasRelationships) {
+            throw ValidationException::withMessages(['project_id' => 'This task is linked to another task in its current project. Remove the links before moving it.']);
+        }
+        $hasPendingTimer = TaskTimerSession::query()->where('task_id', $task->id)->get()
+            ->contains(fn (TaskTimerSession $session): bool => $session->started_at !== null || $session->segments !== []);
+        $entries = $task->timeEntries()->withTrashed()->lockForUpdate()->get();
+        if ($hasPendingTimer || $entries->contains(fn ($entry): bool => ! $entry->trashed() && $entry->end === null)) {
+            throw ValidationException::withMessages(['project_id' => 'Finish or save the task’s active timer before moving it.']);
+        }
+        if ($entries->isNotEmpty() && ! $this->hasPermission($organization, 'time-entries:update:all')) {
+            $this->checkPermission($organization, 'time-entries:update:own');
+            $member = $this->member($organization);
+            if ($entries->contains(fn ($entry): bool => $entry->member_id !== $member->id)) {
+                throw new AuthorizationException('You do not have permission to move another member’s time entries.');
+            }
+        }
+
+        foreach ($entries as $entry) {
+            $entry->project()->associate($destination);
+            $entry->client()->associate($destination->client_id);
+            $entry->setComputedAttributeValue('billable_rate');
+            $entry->save();
+        }
+        TaskHistoryEntry::query()->where('task_id', $task->id)->increment('version', 1, ['project_id' => $destination->id]);
+        $task->project()->associate($destination);
+
+        if ($entries->isNotEmpty()) {
+            RecalculateSpentTimeForProject::dispatch($source)->afterCommit();
+            RecalculateSpentTimeForProject::dispatch($destination)->afterCommit();
+        }
+    }
+
+    private function ensureUniqueName(Project $project, Task $task): void
+    {
+        $duplicates = $project->tasks()->where('name', $task->name);
+        if ($task->exists) {
+            $duplicates->whereKeyNot($task->id);
+        }
+        if ($duplicates->exists()) {
+            throw ValidationException::withMessages(['name' => __('validation.task_name_already_exists')]);
+        }
     }
 
     /**

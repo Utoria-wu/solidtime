@@ -33,6 +33,9 @@ const open = ref(false);
 const showCreateProject = ref(false);
 const { projects } = useProjectsQuery();
 const { clients } = useClientsQuery();
+const props = withDefaults(defineProps<{ activeOnly?: boolean; allowCreate?: boolean }>(), {
+    allowCreate: true,
+});
 const emit = defineEmits(['update:modelValue', 'changed']);
 
 const activeClients = computed(() => clients.value.filter((c) => !c.is_archived));
@@ -50,6 +53,7 @@ const sortedProjects = computed(() => {
 
 const shownProjects = computed(() => {
     return sortedProjects.value.filter((project) => {
+        if (props.activeOnly && project.is_archived && project.id !== model.value) return false;
         return project.name.toLowerCase().includes(searchValue.value?.toLowerCase()?.trim() || '');
     });
 });
@@ -157,7 +161,7 @@ function updateValue(project: Project) {
                             </ComboboxVirtualizer>
                         </ComboboxViewport>
                         <div
-                            v-if="canCreateProjects()"
+                            v-if="allowCreate && canCreateProjects()"
                             class="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground border-t border-popover-border"
                             @click="
                                 open = false;
@@ -172,6 +176,7 @@ function updateValue(project: Project) {
         </template>
     </Dropdown>
     <ProjectCreateModal
+        v-if="allowCreate"
         v-model:show="showCreateProject"
         :create-project="handleCreateProject"
         :create-client="handleCreateClient"

@@ -750,6 +750,7 @@ const TaskStoreRequest = z
 const TaskUpdateRequest = z
     .object({
         name: z.string().min(1).max(255),
+        project_id: z.string().uuid().optional(),
         is_done: z.boolean().optional(),
         is_canceled: z.boolean().optional(),
         start_date: z.union([z.string(), z.null()]).optional(),

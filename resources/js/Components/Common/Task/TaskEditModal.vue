@@ -2,7 +2,7 @@
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import DialogModal from '@/packages/ui/src/DialogModal.vue';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import { useFocus } from '@vueuse/core';
 import { useTasksStore } from '@/utils/useTasks';
@@ -14,6 +14,11 @@ import TaskDatesField from './TaskDatesField.vue';
 import EstimatedTimeSection from '@/packages/ui/src/EstimatedTimeSection.vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { Field, FieldGroup, FieldLabel } from '@/packages/ui/src/field';
+import { Button } from '@/packages/ui/src/Buttons';
+import { ChevronDown } from '@lucide/vue';
+import { FolderIcon } from '@heroicons/vue/20/solid';
+import ProjectDropdown from '@/Components/Common/Project/ProjectDropdown.vue';
+import { canCreateTasks } from '@/utils/permissions';
 
 const { updateTask } = useTasksStore();
 const show = defineModel<boolean>('show', { default: false });
@@ -29,6 +34,10 @@ const taskBody = ref<UpdateTaskBody>({
 });
 
 const categoryId = ref<string | null>(props.task.category_id ?? null);
+const projectId = ref<string | null>(props.task.project_id);
+const moving = computed(
+    () => projectId.value !== null && projectId.value !== props.task.project_id
+);
 const stage = ref(props.task.stage ?? '');
 const taskNotes = ref<string | null>(props.task.markdown_notes ?? null);
 const taskDates = ref({
@@ -38,6 +47,7 @@ const taskDates = ref({
 
 watch(show, (open) => {
     if (!open) return;
+    projectId.value = props.task.project_id;
     taskNotes.value = props.task.markdown_notes ?? null;
     categoryId.value = props.task.category_id ?? null;
     stage.value = props.task.stage ?? '';
@@ -58,6 +68,7 @@ async function submit() {
             markdown_notes: taskNotes.value,
             category_id: categoryId.value,
             stage: stage.value.trim() || null,
+            ...(moving.value && projectId.value ? { project_id: projectId.value } : {}),
         });
         if (result) show.value = false;
     } finally {
@@ -93,6 +104,31 @@ useFocus(taskNameInput, { initialValue: true });
                         autocomplete="off"
                         @keydown.enter="submit()" />
                 </Field>
+                <Field v-if="canCreateTasks()">
+                    <FieldLabel :icon="FolderIcon" for="taskEditProject">Project</FieldLabel>
+                    <ProjectDropdown v-model="projectId" active-only :allow-create="false">
+                        <template #trigger="{ selectedProjectName, selectedProjectColor }">
+                            <Button
+                                id="taskEditProject"
+                                type="button"
+                                variant="input"
+                                class="w-full justify-between"
+                                :aria-describedby="moving ? 'taskMoveHelp' : undefined">
+                                <span class="flex min-w-0 items-center gap-2">
+                                    <span
+                                        class="size-3 shrink-0 rounded-full"
+                                        :style="{ backgroundColor: selectedProjectColor }" />
+                                    <span class="truncate">{{ selectedProjectName }}</span>
+                                </span>
+                                <ChevronDown class="size-4 shrink-0 text-icon-default" />
+                            </Button>
+                        </template>
+                    </ProjectDropdown>
+                    <p v-if="moving" id="taskMoveHelp" class="text-sm text-text-secondary">
+                        This also moves the task’s Calendar entries and history. The destination
+                        project’s billing rates apply.
+                    </p>
+                </Field>
                 <div class="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
                     <TaskDatesField v-model="taskDates" />
                     <EstimatedTimeSection
@@ -102,7 +138,7 @@ useFocus(taskNameInput, { initialValue: true });
                 </div>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <TaskCategoryField v-model="categoryId" />
-                    <TaskStageField v-model="stage" :project-id="task.project_id" />
+                    <TaskStageField v-model="stage" :project-id="projectId ?? task.project_id" />
                 </div>
                 <TimeEntryNotesField v-model="taskNotes" label="Task notes" />
             </FieldGroup>
@@ -114,7 +150,7 @@ useFocus(taskNameInput, { initialValue: true });
                 :class="{ 'opacity-25': saving }"
                 :disabled="saving"
                 @click="submit">
-                Update Task
+                {{ moving ? 'Move Task' : 'Update Task' }}
             </PrimaryButton>
         </template>
     </DialogModal>

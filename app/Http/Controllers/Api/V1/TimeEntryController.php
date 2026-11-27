@@ -657,7 +657,13 @@ class TimeEntryController extends Controller
         $timeEntry->description = $request->input('description') ?? '';
         $timeEntry->organization()->associate($organization);
         $timeEntry->setComputedAttributeValue('billable_rate');
-        $timeEntry->save();
+        DB::transaction(function () use ($timeEntry, $task): void {
+            if ($task !== null) {
+                $current = Task::query()->lockForUpdate()->findOrFail($task->id);
+                abort_unless($current->project_id === $timeEntry->project_id, 409, 'This task moved to another project. Reload the time entry form.');
+            }
+            $timeEntry->save();
+        });
 
         if ($project !== null) {
             RecalculateSpentTimeForProject::dispatch($project);
@@ -733,6 +739,10 @@ class TimeEntryController extends Controller
         DB::transaction(function () use ($timeEntry, $oldTask): void {
             $taskIds = array_filter([$oldTask?->id, $timeEntry->task_id]);
             $affectedTasks = Task::query()->whereIn('id', $taskIds)->orderBy('id')->lockForUpdate()->get();
+            if ($timeEntry->task_id !== null) {
+                $current = $affectedTasks->firstWhere('id', $timeEntry->task_id);
+                abort_unless($current !== null && $current->project_id === $timeEntry->project_id, 409, 'This task moved to another project. Reload the time entry form.');
+            }
             $timeEntry->save();
             foreach ($affectedTasks as $affectedTask) {
                 $affectedTask->setComputedAttributeValue('spent_time');
@@ -866,7 +876,21 @@ class TimeEntryController extends Controller
                 $timeEntry->client()->associate($client);
             }
             $timeEntry->setComputedAttributeValue('billable_rate');
-            $timeEntry->save();
+            $saved = DB::transaction(function () use ($timeEntry, $oldTask): bool {
+                $taskIds = array_filter([$oldTask?->id, $timeEntry->task_id]);
+                $locked = Task::query()->whereIn('id', $taskIds)->orderBy('id')->lockForUpdate()->get();
+                $current = $locked->firstWhere('id', $timeEntry->task_id);
+                if ($timeEntry->task_id !== null && ($current === null || $current->project_id !== $timeEntry->project_id)) {
+                    return false;
+                }
+
+                return $timeEntry->save();
+            });
+            if (! $saved) {
+                $error->push($id);
+
+                continue;
+            }
             if ($oldTask !== null) {
                 RecalculateSpentTimeForTask::dispatch($oldTask);
             }

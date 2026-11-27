@@ -1,4 +1,4 @@
-import { flushPromises, shallowMount } from '@vue/test-utils';
+import { shallowMount } from '@vue/test-utils';
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query';
 import { ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -15,6 +15,7 @@ vi.mock('@/utils/useUser', () => ({
 vi.mock('@/utils/permissions', () => ({
     canCreateTags: () => false,
     canUpdateTags: () => false,
+    canUpdateTasks: () => false,
     canViewAllTimeEntries: () => false,
 }));
 vi.mock('@/utils/useTaskHistory', () => ({
@@ -49,7 +50,15 @@ function mountHistory(tasks: Task[] = []) {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const wrapper = shallowMount(ProjectTaskHistory, {
         props: { projectId: 'project-1', tasks },
-        global: { plugins: [[VueQueryPlugin, { queryClient: client }]] },
+        global: {
+            plugins: [[VueQueryPlugin, { queryClient: client }]],
+            stubs: {
+                ProjectHistoryTimeline: false,
+                Popover: { template: '<div><slot /></div>' },
+                PopoverTrigger: { template: '<div><slot /></div>' },
+                PopoverContent: { template: '<div><slot /></div>' },
+            },
+        },
     });
     return {
         wrapper,
@@ -90,8 +99,8 @@ describe('ProjectTaskHistory', () => {
         await vi.waitFor(() => expect(wrapper.findAll('article')).toHaveLength(2));
 
         expect(wrapper.findAll('article').map((record) => record.attributes('id'))).toEqual([
-            'history-older-entry',
             'history-calendar-entry',
+            'history-older-entry',
         ]);
         const older = wrapper.get('#history-older-entry');
         expect(older.text()).toContain('Review session');
@@ -144,18 +153,26 @@ describe('ProjectTaskHistory', () => {
         expect(wrapper.get('#history-completed-task-1').text()).toContain('Task complete');
         expect(wrapper.find('#history-running-entry').exists()).toBe(false);
 
-        const buttons = wrapper.findAll('aside button');
-        await buttons
-            .find((button) => button.text().startsWith('Calendar without task'))!
-            .trigger('click');
+        await wrapper.get('select[aria-label="Activity type"]').setValue('unlinked');
         expect(wrapper.findAll('article').map((record) => record.attributes('id'))).toEqual([
             'history-project-entry',
         ]);
-        await buttons.find((button) => button.text().startsWith('Project task'))!.trigger('click');
+        const historyViews = wrapper.get('[aria-label="History view"]');
+        await historyViews
+            .findAll('button')
+            .find((button) => button.text() === 'Tasks')!
+            .trigger('click');
+        await wrapper
+            .findAll('li button')
+            .find((button) => button.text().startsWith('Project task'))!
+            .trigger('click');
         expect(wrapper.findAll('article')).toHaveLength(3);
         expect(wrapper.find('#history-project-entry').exists()).toBe(false);
-        await buttons.find((button) => button.text().startsWith('All activity'))!.trigger('click');
-        await flushPromises();
+        await historyViews
+            .findAll('button')
+            .find((button) => button.text() === 'Timeline')!
+            .trigger('click');
+        await wrapper.get('select[aria-label="Activity type"]').setValue('all');
         expect(wrapper.findAll('article')).toHaveLength(4);
     });
 });

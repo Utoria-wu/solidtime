@@ -9,6 +9,7 @@ use App\Models\Organization;
 use App\Models\Task;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Korridor\LaravelModelValidationRules\Rules\UniqueEloquent;
 
@@ -25,17 +26,18 @@ class TaskUpdateRequest extends BaseFormRequest
      */
     public function rules(): array
     {
+        $name = ['required', 'string', 'min:1', 'max:255'];
+        $destination = $this->input('project_id');
+        if (! is_string($destination) || ! Str::isUuid($destination) || strtolower($destination) === $this->task?->project_id) {
+            $name[] = UniqueEloquent::make(Task::class, 'name', function (Builder $builder): Builder {
+                /** @var Builder<Task> $builder */
+                return $builder->where('project_id', '=', $this->task?->project_id);
+            })->ignore($this->task?->getKey())->withCustomTranslation('validation.task_name_already_exists');
+        }
+
         return [
-            'name' => [
-                'required',
-                'string',
-                'min:1',
-                'max:255',
-                UniqueEloquent::make(Task::class, 'name', function (Builder $builder): Builder {
-                    /** @var Builder<Task> $builder */
-                    return $builder->where('project_id', '=', $this->task->project_id);
-                })->ignore($this->task?->getKey())->withCustomTranslation('validation.task_name_already_exists'),
-            ],
+            'project_id' => ['sometimes', 'required', 'uuid', Rule::exists('projects', 'id')->where('organization_id', $this->organization->id)],
+            'name' => $name,
             'is_canceled' => ['sometimes', 'boolean', 'prohibits:is_done'],
             'is_done' => [
                 'boolean',

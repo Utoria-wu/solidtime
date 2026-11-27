@@ -9,7 +9,7 @@ import { getDayJsInstance, getLocalizedDayJs } from '@/packages/ui/src/utils/tim
 import { useTaskCategories } from '@/utils/useTaskHistory';
 import ProjectTaskHistory from './ProjectTaskHistory.vue';
 import TaskScheduleTrack from './TaskScheduleTrack.vue';
-import { useTimestamp } from '@vueuse/core';
+import { createReusableTemplate, useTimestamp } from '@vueuse/core';
 import { useTaskTimers } from '@/utils/useTaskTimers';
 import TaskActivityDialog from './TaskActivityDialog.vue';
 import TaskLinkDialog from './TaskLinkDialog.vue';
@@ -112,6 +112,10 @@ const timersByTask = computed(() => new Map(timers.value.map((timer) => [timer.t
 const timestamp = useTimestamp({ interval: 1000 });
 const now = computed(() => Math.floor(timestamp.value / 1000));
 const view = ref<'list' | 'schedule' | 'history'>(props.initialView ?? 'list');
+const [DefineViewSwitcher, ViewSwitcher] = createReusableTemplate();
+const showHistory = computed(
+    () => props.allowHistory && view.value === 'history' && !!props.projectId
+);
 const viewOptions = computed(
     () =>
         [
@@ -221,14 +225,12 @@ function plannedDates(task: Task) {
         v-model:show="linkOpen"
         :task="linkingTask" />
     <TaskCreateModal v-if="projectId" v-model:show="createTask" :project-id="projectId" />
-    <div
-        v-if="allowSchedule || scheduleProjects || allowHistory"
-        class="flex flex-wrap items-center justify-between gap-3 py-3">
+    <DefineViewSwitcher>
         <div
             v-if="allowSchedule || allowHistory"
             role="group"
             aria-label="Task view"
-            class="flex gap-1 rounded-lg bg-tertiary p-1">
+            class="inline-flex shrink-0 gap-1 rounded-lg bg-tertiary p-1">
             <button
                 v-for="option in viewOptions"
                 :key="option"
@@ -239,6 +241,11 @@ function plannedDates(task: Task) {
                 {{ option === 'history' ? 'History' : t(option === 'list' ? 'List' : 'Schedule') }}
             </button>
         </div>
+    </DefineViewSwitcher>
+    <div
+        v-if="!showHistory && (allowSchedule || scheduleProjects || allowHistory)"
+        class="flex flex-wrap items-center justify-between gap-3 py-3">
+        <ViewSwitcher />
         <div class="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
             <slot name="toolbar" />
             <div v-if="showSchedule" class="flex flex-wrap items-center gap-2 text-sm">
@@ -276,10 +283,13 @@ function plannedDates(task: Task) {
         </div>
     </div>
     <ProjectTaskHistory
-        v-if="allowHistory && view === 'history' && projectId"
+        v-if="showHistory && projectId"
         :project-id="projectId"
         :tasks="historyTasks ?? tasks"
-        @open-activity="openActivity" />
+        @open-activity="openActivity">
+        <template #navigation><ViewSwitcher /></template>
+        <template #actions><slot name="actions" /></template>
+    </ProjectTaskHistory>
     <TooltipProvider v-else :delay-duration="180">
         <div class="flow-root overflow-x-auto">
             <div class="inline-block min-w-full align-middle">

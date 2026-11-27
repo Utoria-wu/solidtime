@@ -3584,13 +3584,11 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         ]);
         $project = Project::factory()->forOrganization($data->organization)->create();
         $task = Task::factory()->forOrganization($data->organization)->forProject($project)->create();
-        $timeEntry = TimeEntry::factory()->forOrganization($data->organization)->forProject(null)->forTask(null)->forMember($data->member)->create();
-        TimeEntry::factory()->forOrganization($data->organization)->make();
+        $start = now()->subHours(2)->startOfSecond();
+        $timeEntry = TimeEntry::factory()->forOrganization($data->organization)->forProject(null)->forTask(null)->forMember($data->member)
+            ->create(['start' => $start, 'end' => $start->copy()->addHour()]);
         Passport::actingAs($data->user);
-        Queue::fake([
-            RecalculateSpentTimeForProject::class,
-            RecalculateSpentTimeForTask::class,
-        ]);
+        Queue::fake([RecalculateSpentTimeForProject::class]);
 
         // Act
         $response = $this->putJson(route('api.v1.time-entries.update', [$data->organization->getKey(), $timeEntry->getKey()]), [
@@ -3601,13 +3599,10 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         // Assert
         $this->assertResponseCode($response, 200);
         Queue::assertPushed(RecalculateSpentTimeForProject::class, 1);
-        Queue::assertPushed(RecalculateSpentTimeForTask::class, 1);
         Queue::assertPushed(function (RecalculateSpentTimeForProject $job) use ($project): bool {
             return $job->project->is($project);
         }, 1);
-        Queue::assertPushed(function (RecalculateSpentTimeForTask $job) use ($task): bool {
-            return $job->task->is($task);
-        }, 1);
+        $this->assertDatabaseHas(Task::class, ['id' => $task->id, 'spent_time' => 3600]);
     }
 
     public function test_update_endpoint_recalculates_project_and_task_spend_time_after_updating_time_entry_settings_a_new_project_and_a_new_task(): void
@@ -3619,15 +3614,13 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         ]);
         $oldProject = Project::factory()->forOrganization($data->organization)->create();
         $oldTask = Task::factory()->forOrganization($data->organization)->forProject($oldProject)->create();
-        $timeEntry = TimeEntry::factory()->forOrganization($data->organization)->forProject($oldProject)->forTask($oldTask)->forMember($data->member)->create();
+        $start = now()->subHours(2)->startOfSecond();
+        $timeEntry = TimeEntry::factory()->forOrganization($data->organization)->forProject($oldProject)->forTask($oldTask)->forMember($data->member)
+            ->create(['start' => $start, 'end' => $start->copy()->addHour()]);
         $project = Project::factory()->forOrganization($data->organization)->create();
         $task = Task::factory()->forOrganization($data->organization)->forProject($project)->create();
-        TimeEntry::factory()->forOrganization($data->organization)->make();
         Passport::actingAs($data->user);
-        Queue::fake([
-            RecalculateSpentTimeForProject::class,
-            RecalculateSpentTimeForTask::class,
-        ]);
+        Queue::fake([RecalculateSpentTimeForProject::class]);
 
         // Act
         $response = $this->putJson(route('api.v1.time-entries.update', [$data->organization->getKey(), $timeEntry->getKey()]), [
@@ -3638,19 +3631,14 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         // Assert
         $this->assertResponseCode($response, 200);
         Queue::assertPushed(RecalculateSpentTimeForProject::class, 2);
-        Queue::assertPushed(RecalculateSpentTimeForTask::class, 2);
         Queue::assertPushed(function (RecalculateSpentTimeForProject $job) use ($project): bool {
             return $job->project->is($project);
         }, 1);
         Queue::assertPushed(function (RecalculateSpentTimeForProject $job) use ($oldProject): bool {
             return $job->project->is($oldProject);
         }, 1);
-        Queue::assertPushed(function (RecalculateSpentTimeForTask $job) use ($task): bool {
-            return $job->task->is($task);
-        }, 1);
-        Queue::assertPushed(function (RecalculateSpentTimeForTask $job) use ($oldTask): bool {
-            return $job->task->is($oldTask);
-        }, 1);
+        $this->assertDatabaseHas(Task::class, ['id' => $task->id, 'spent_time' => 3600]);
+        $this->assertDatabaseHas(Task::class, ['id' => $oldTask->id, 'spent_time' => 0]);
     }
 
     public function test_destroy_endpoint_fails_if_user_tries_to_delete_time_entry_in_organization_that_they_does_belong_to(): void

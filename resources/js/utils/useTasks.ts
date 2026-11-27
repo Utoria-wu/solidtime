@@ -24,6 +24,11 @@ export const useTasksStore = defineStore('tasks', () => {
                 'Failed to update task'
             );
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            if (result && taskBody.project_id) {
+                for (const key of ['projects', 'timeEntries', 'taskHistory', 'goals']) {
+                    void queryClient.invalidateQueries({ queryKey: [key] });
+                }
+            }
             return result;
         }
     }

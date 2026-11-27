@@ -1,55 +1,84 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { useQuery } from '@tanstack/vue-query';
-import { renderNotes } from '@/packages/ui/src/utils/notes';
 import {
     AdjustmentsHorizontalIcon,
-    ArrowPathIcon,
-    CheckCircleIcon,
-    ChevronDownIcon,
+    ArrowLeftIcon,
     ChevronRightIcon,
-    ClockIcon,
-    DocumentTextIcon,
+    MagnifyingGlassIcon,
 } from '@heroicons/vue/20/solid';
 import { api, type Task, type TimeEntry } from '@/packages/api/src';
-import {
-    historyKinds,
-    useTaskCategories,
-    useTaskHistory,
-    type HistoryEntry,
-} from '@/utils/useTaskHistory';
-import { canCreateTags, canUpdateTags, canViewAllTimeEntries } from '@/utils/permissions';
-import { getCurrentMembershipId, getCurrentOrganizationId } from '@/utils/useUser';
 import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
+import { Popover, PopoverContent, PopoverTrigger } from '@/packages/ui/src/popover';
+import { historyKinds, useTaskCategories, useTaskHistory } from '@/utils/useTaskHistory';
 import { useTaskRelationships } from '@/utils/useTaskRelationships';
-import TaskCategoryManager from './TaskCategoryManager.vue';
+import {
+    canCreateTags,
+    canUpdateTags,
+    canUpdateTasks,
+    canViewAllTimeEntries,
+} from '@/utils/permissions';
+import { getCurrentMembershipId, getCurrentOrganizationId } from '@/utils/useUser';
+import ProjectHistoryTimeline, { type ProjectHistoryRecord } from './ProjectHistoryTimeline.vue';
 import TaskRelationshipMap from './TaskRelationshipMap.vue';
+import TaskCategoryManager from './TaskCategoryManager.vue';
+import TaskEditModal from './TaskEditModal.vue';
 
 const props = defineProps<{ projectId: string; tasks: Task[] }>();
 const emit = defineEmits<{ openActivity: [task: Task] }>();
 const { categories, isError: categoryError } = useTaskCategories();
 const legacy = useTaskHistory(props.projectId);
 const taskLinks = useTaskRelationships(props.projectId);
-const expandedMap = ref<string | null>(null);
-const unlinkedCalendar = 'unlinked-calendar';
-const selectedFilter = ref<string | null>(null);
-const groupBy = ref<'category' | 'stage'>('category');
-const collapsed = ref(new Set<string>());
-const manage = ref(false);
-const categoryMap = computed(() => new Map(categories.value.map((c) => [c.id, c])));
-const taskMap = computed(() => new Map(props.tasks.map((task) => [task.id, task])));
-const calendarKey = computed(
-    () =>
-        [
-            'timeEntries',
-            'project-history',
-            getCurrentOrganizationId(),
-            props.projectId,
-            canViewAllTimeEntries() ? null : getCurrentMembershipId(),
-        ] as const
+
+const views = [
+    { key: 'timeline', label: 'Timeline' },
+    { key: 'tasks', label: 'Tasks' },
+    { key: 'problems', label: 'Problems' },
+] as const;
+type HistoryView = (typeof views)[number]['key'];
+const view = ref<HistoryView>('timeline');
+const selectedTaskId = ref<string | null>(null);
+const selectedProblemId = ref<string | null>(null);
+const search = ref('');
+const stage = ref<string | null>(null);
+const category = ref<string | null>(null);
+const activityType = ref('all');
+const oldestFirst = ref(false);
+const filtersOpen = ref(false);
+const canManageCategories = computed(
+    () => view.value === 'tasks' && (canCreateTags() || canUpdateTags())
 );
+const filterCount = computed(
+    () =>
+        Number(stage.value !== null) +
+        Number(category.value !== null) +
+        Number(view.value === 'timeline' && activityType.value !== 'all')
+);
+const manage = ref(false);
+const editTask = ref(false);
+const detailHeading = ref<HTMLElement | null>(null);
+const categoryMap = computed(() => new Map(categories.value.map((item) => [item.id, item])));
+const taskMap = computed(() => new Map(props.tasks.map((task) => [task.id, task])));
+const activeTask = computed(() => taskMap.value.get(selectedTaskId.value ?? ''));
+const stages = computed(() =>
+    [
+        ...new Set(
+            props.tasks.map((task) => task.stage).filter((value): value is string => Boolean(value))
+        ),
+    ].sort()
+);
+
 const calendar = useQuery({
-    queryKey: calendarKey,
+    queryKey: computed(
+        () =>
+            [
+                'timeEntries',
+                'project-history',
+                getCurrentOrganizationId(),
+                props.projectId,
+                canViewAllTimeEntries() ? null : getCurrentMembershipId(),
+            ] as const
+    ),
     enabled: () => Boolean(getCurrentOrganizationId() && getCurrentMembershipId()),
     queryFn: async ({ queryKey: [, , organization, project, member], signal }) => {
         if (!organization) throw new Error('No organization');
@@ -71,483 +100,541 @@ const calendar = useQuery({
     },
 });
 
-type HistoryRecord = {
-    id: string;
-    task: Task | null;
-    title: string;
-    date: string;
-    label: string;
-    note: string | null;
-    icon: typeof ClockIcon;
-    color: string;
-    calendarUrl?: string;
-    legacy?: HistoryEntry;
-};
+function calendarUrl(id: string, date: string) {
+    return (
+        '/calendar?' +
+        new URLSearchParams({ date: getLocalizedDayJs(date).format('YYYY-MM-DD'), entry: id })
+    );
+}
 
 const records = computed(() => {
-    const result: HistoryRecord[] = [];
+    const result: ProjectHistoryRecord[] = [];
     for (const task of props.tasks) {
         if (task.created_at)
             result.push({
                 id: `created-${task.id}`,
                 task,
+                type: 'created',
                 title: task.name,
                 date: task.created_at,
                 label: 'Created',
                 note: task.markdown_notes ?? null,
-                icon: DocumentTextIcon,
                 color: '#5389b0',
             });
         if (task.done_at)
             result.push({
                 id: `completed-${task.id}`,
                 task,
+                type: 'completed',
                 title: task.name,
                 date: task.done_at,
                 label: 'Completed',
                 note: task.completion_notes ?? null,
-                icon: CheckCircleIcon,
                 color: '#4e936d',
             });
     }
     for (const event of calendar.data.value ?? []) {
         if (!event.end) continue;
         const task = (event.task_id && taskMap.value.get(event.task_id)) || null;
-        const query = new URLSearchParams({
-            date: getLocalizedDayJs(event.start).format('YYYY-MM-DD'),
-            entry: event.id,
-        });
         result.push({
             id: event.id,
             task,
+            type: 'calendar',
             title: event.description?.trim() || task?.name || 'Untitled Calendar entry',
             date: event.start,
             label: 'Calendar',
             note: event.markdown_notes ?? null,
-            icon: ClockIcon,
             color: '#789487',
-            calendarUrl: '/calendar?' + query.toString(),
+            calendarUrl: calendarUrl(event.id, event.start),
         });
     }
     for (const entry of legacy.entries.value) {
         const task = taskMap.value.get(entry.task_id);
         if (!task) continue;
+        const kind = historyKinds[entry.kind];
         result.push({
             id: entry.id,
             task,
-            title: task.name,
+            type: 'record',
+            title: entry.title.trim() || task.name,
             date: entry.occurred_at,
-            label: historyKinds[entry.kind].label,
+            label: kind.label,
             note: entry.markdown_notes,
-            icon: ArrowPathIcon,
-            color: historyKinds[entry.kind].color,
+            color: kind.color,
             legacy: entry,
+            calendarUrl: entry.source
+                ? calendarUrl(entry.source.id, entry.source.start)
+                : undefined,
         });
     }
-    return result.sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
+    return result.sort(
+        (a, b) => Date.parse(b.date) - Date.parse(a.date) || a.id.localeCompare(b.id)
+    );
 });
 
-const taskCounts = computed(() => {
-    const counts = new Map<string, number>();
+const recordsByTask = computed(() => {
+    const result = new Map<string, ProjectHistoryRecord[]>();
     for (const record of records.value) {
-        const key = record.task?.id ?? unlinkedCalendar;
-        counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return counts;
-});
-
-const days = computed(() => {
-    const result = new Map<string, HistoryRecord[]>();
-    for (const record of records.value) {
-        if (selectedFilter.value && selectedFilter.value !== (record.task?.id ?? unlinkedCalendar))
-            continue;
-        const date = getLocalizedDayJs(record.date).format('YYYY-MM-DD');
-        const day = result.get(date) ?? [];
-        day.push(record);
-        result.set(date, day);
+        if (!record.task) continue;
+        const taskRecords = result.get(record.task.id) ?? [];
+        taskRecords.push(record);
+        result.set(record.task.id, taskRecords);
     }
     return result;
 });
+const taskRecords = computed(() =>
+    [...(recordsByTask.value.get(activeTask.value?.id ?? '') ?? [])].reverse()
+);
+const relationshipTaskIds = computed(
+    () =>
+        new Set(
+            taskLinks.relationships.value.flatMap((edge) => [edge.task_id, edge.related_task_id])
+        )
+);
 
-const mapRecords = computed(() => {
-    const linked = new Set<string>();
-    for (const edge of taskLinks.relationships.value) {
-        if (!taskMap.value.has(edge.task_id) || !taskMap.value.has(edge.related_task_id)) continue;
-        linked.add(edge.task_id);
-        linked.add(edge.related_task_id);
-    }
-    const anchors = new Map<string, HistoryRecord>();
-    const priority = (record: HistoryRecord) =>
-        record.legacy?.kind === 'problem' ? 0 : record.id.startsWith('created-') ? 1 : 2;
-    for (const day of days.value.values()) {
-        for (const record of day) {
-            const taskId = record.task?.id;
-            if (!taskId || !linked.has(taskId)) continue;
-            const current = anchors.get(taskId);
-            if (!current || priority(record) < priority(current)) anchors.set(taskId, record);
-        }
-    }
-    return new Set([...anchors.values()].map((record) => record.id));
-});
-const groups = computed(() => {
-    const result = new Map<string, { name: string; color: string; tasks: Task[]; order: number }>();
-    for (const task of props.tasks) {
-        const category = categoryMap.value.get(task.category_id ?? '');
-        const id = groupBy.value === 'category' ? (task.category_id ?? '') : (task.stage ?? '');
-        const group = result.get(id) ?? {
-            name:
-                groupBy.value === 'category'
-                    ? (category?.name ?? 'Uncategorized')
-                    : task.stage || 'No stage',
-            color: category?.color ?? '#9ca3af',
-            tasks: [],
-            order: category?.sort_order ?? 1000001,
-        };
-        group.tasks.push(task);
-        result.set(id, group);
-    }
-    return [...result].sort((a, b) =>
-        groupBy.value === 'category'
-            ? a[1].order - b[1].order || a[1].name.localeCompare(b[1].name)
-            : a[1].name.localeCompare(b[1].name)
+function matchesFilters(task: Task | null) {
+    return (
+        (stage.value === null || (task !== null && (task.stage ?? '') === stage.value)) &&
+        (category.value === null || (task !== null && (task.category_id ?? '') === category.value))
     );
-});
-function toggle(id: string) {
-    const next = new Set(collapsed.value);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    collapsed.value = next;
 }
+
+function matchesSearch(...values: (string | null | undefined)[]) {
+    const query = search.value.trim().toLocaleLowerCase();
+    return !query || values.some((value) => value?.toLocaleLowerCase().includes(query));
+}
+
+const timeline = computed(() => {
+    const filtered = records.value.filter((record) => {
+        if (
+            !matchesFilters(record.task) ||
+            !matchesSearch(record.title, record.task?.name, record.note, record.label)
+        )
+            return false;
+        if (activityType.value === 'unlinked') return record.type === 'calendar' && !record.task;
+        if (activityType.value === 'calendar') return record.type === 'calendar';
+        return true;
+    });
+    return oldestFirst.value ? filtered.reverse() : filtered;
+});
+const taskList = computed(() =>
+    props.tasks.filter(
+        (task) =>
+            matchesFilters(task) &&
+            matchesSearch(task.name, task.markdown_notes, task.stage, task.completion_notes)
+    )
+);
+
+const problems = computed(() => {
+    const rows = records.value
+        .filter((record) => record.legacy?.kind === 'problem')
+        .flatMap((root) => {
+            if (!root.task) return [];
+            const updates = (recordsByTask.value.get(root.task.id) ?? [])
+                .filter((record) => record.legacy?.issue_id === root.id)
+                .reverse();
+            const outcome =
+                [...updates].reverse().find((record) => record.legacy?.outcome)?.legacy?.outcome ??
+                root.legacy?.outcome;
+            return [
+                {
+                    id: root.id,
+                    task: root.task,
+                    title: root.title,
+                    date: root.date,
+                    note: root.note,
+                    outcome,
+                    updates: [root, ...updates],
+                },
+            ];
+        });
+    const explicit = new Set(rows.map((problem) => problem.task.id));
+    for (const edge of taskLinks.relationships.value) {
+        if (edge.kind !== 'fixes' || explicit.has(edge.related_task_id)) continue;
+        const task = taskMap.value.get(edge.related_task_id);
+        if (!task) continue;
+        explicit.add(task.id);
+        rows.push({
+            id: `problem-${task.id}`,
+            task,
+            title: task.name,
+            date: task.created_at,
+            note: task.markdown_notes ?? null,
+            outcome: null,
+            updates: [...(recordsByTask.value.get(task.id) ?? [])].reverse(),
+        });
+    }
+    return rows.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+});
+const visibleProblems = computed(() =>
+    problems.value.filter(
+        (row) =>
+            matchesFilters(row.task) &&
+            matchesSearch(
+                row.title,
+                row.task.name,
+                row.note,
+                ...row.updates.map((update) => update.note)
+            )
+    )
+);
+const activeProblem = computed(() =>
+    problems.value.find((row) => row.id === selectedProblemId.value)
+);
+const backLabel = computed(
+    () => 'Back to ' + (views.find((item) => item.key === view.value)?.label ?? 'History')
+);
+const loading = computed(() => calendar.isPending.value || legacy.isPending.value);
+const historyError = computed(
+    () => calendar.isError.value || legacy.isError.value || taskLinks.isError.value
+);
+const detailTask = computed(() => activeTask.value ?? activeProblem.value?.task);
+
+function selectView(next: HistoryView) {
+    view.value = next;
+    filtersOpen.value = false;
+    selectedTaskId.value = null;
+    selectedProblemId.value = null;
+}
+
+function clearFilters() {
+    stage.value = null;
+    category.value = null;
+    if (view.value === 'timeline') activityType.value = 'all';
+}
+
+function selectTask(task: Task) {
+    selectedTaskId.value = task.id;
+    selectedProblemId.value = null;
+}
+
+function status(task: Task) {
+    return task.is_canceled ? 'Canceled' : task.is_done ? 'Done' : 'Active';
+}
+
+function retry() {
+    if (calendar.isError.value) void calendar.refetch();
+    if (legacy.isError.value) void legacy.refetch();
+    if (taskLinks.isError.value) void taskLinks.refetch();
+}
+
+watch([selectedTaskId, selectedProblemId], async ([taskId, problemId]) => {
+    if (!taskId && !problemId) return;
+    await nextTick();
+    detailHeading.value?.focus();
+});
+watch(
+    () => detailTask.value?.id,
+    (id) => {
+        if (!id) editTask.value = false;
+    }
+);
 </script>
 
 <template>
-    <div data-testid="project_history" class="overflow-hidden">
-        <div class="history-layout">
-            <aside class="history-explorer border-r border-default-background-separator">
-                <div class="flex items-center justify-between px-4 py-4">
-                    <select
-                        v-model="groupBy"
-                        aria-label="Group tasks"
-                        class="rounded-md border border-default-background-separator bg-default-background px-2 py-1.5 text-xs font-medium text-text-secondary">
-                        <option value="category">BY CATEGORY</option>
-                        <option value="stage">BY STAGE</option></select
-                    ><button
-                        v-if="canCreateTags() || canUpdateTags()"
+    <div data-testid="project_history" class="pb-6">
+        <div
+            data-testid="history-toolbar"
+            class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-row-separator py-3">
+            <div class="flex max-w-full flex-wrap items-center gap-x-3 gap-y-2">
+                <slot name="navigation" />
+                <div
+                    role="group"
+                    aria-label="History view"
+                    class="hidden items-center gap-0.5 border-l border-row-separator pl-2 sm:inline-flex">
+                    <button
+                        v-for="item in views"
+                        :key="item.key"
+                        :aria-pressed="item.key === view"
                         type="button"
-                        aria-label="Manage categories"
-                        title="Manage categories"
-                        class="rounded p-1 text-text-secondary hover:bg-tertiary"
-                        @click="manage = true">
-                        <AdjustmentsHorizontalIcon class="size-4" />
+                        class="rounded-md px-2.5 py-1.5 text-sm text-text-secondary hover:bg-tertiary aria-pressed:bg-tertiary aria-pressed:font-medium aria-pressed:text-text-primary"
+                        @click="selectView(item.key)">
+                        {{ item.label }}
                     </button>
                 </div>
-                <button
-                    type="button"
-                    class="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-3 py-2 text-left text-sm"
-                    :class="!selectedFilter ? 'bg-tertiary font-medium' : 'text-text-secondary'"
-                    :aria-pressed="!selectedFilter"
-                    @click="selectedFilter = null">
-                    All activity<span class="text-xs">{{ tasks.length }} tasks</span>
-                </button>
-                <button
-                    v-if="taskCounts.has(unlinkedCalendar)"
-                    type="button"
-                    class="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-tertiary"
-                    :class="
-                        selectedFilter === unlinkedCalendar
-                            ? 'bg-tertiary font-medium'
-                            : 'text-text-secondary'
-                    "
-                    :aria-pressed="selectedFilter === unlinkedCalendar"
-                    @click="selectedFilter = unlinkedCalendar">
-                    <ClockIcon class="size-4 shrink-0" />
-                    <span class="flex-1">Calendar without task</span>
-                    <span class="text-xs">{{ taskCounts.get(unlinkedCalendar) }}</span>
-                </button>
-                <div v-for="[id, group] in groups" :key="id" class="mt-4">
-                    <button
-                        type="button"
-                        class="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium"
-                        :aria-expanded="!collapsed.has(id)"
-                        @click="toggle(id)">
-                        <component
-                            :is="collapsed.has(id) ? ChevronRightIcon : ChevronDownIcon"
-                            class="size-3" /><span
-                            class="size-2 rounded-full"
-                            :style="{ background: group.color }" /><span class="flex-1 truncate">{{
-                            group.name
-                        }}</span
-                        ><span class="text-text-secondary">{{ group.tasks.length }}</span>
-                    </button>
-                    <div
-                        v-if="!collapsed.has(id)"
-                        class="ml-6 border-l border-default-background-separator">
+                <select
+                    :value="view"
+                    aria-label="History view"
+                    class="h-8 rounded-md border-0 bg-tertiary py-1 pl-2 pr-6 text-sm sm:hidden"
+                    @change="selectView(($event.target as HTMLSelectElement).value as HistoryView)">
+                    <option v-for="item in views" :key="item.key" :value="item.key">
+                        {{ item.label }}
+                    </option>
+                </select>
+            </div>
+            <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
+                <template v-if="!detailTask">
+                    <label class="relative block">
+                        <MagnifyingGlassIcon
+                            class="pointer-events-none absolute left-2.5 top-2 size-4 text-icon-default"
+                            aria-hidden="true" />
+                        <input
+                            v-model="search"
+                            type="search"
+                            aria-label="Search history"
+                            placeholder="Search…"
+                            class="h-8 w-28 rounded-md border border-default-background-separator bg-default-background py-1 pl-8 pr-2 text-sm xl:w-36" />
+                    </label>
+                    <Popover
+                        v-if="
+                            stages.length ||
+                            categories.length ||
+                            view === 'timeline' ||
+                            canManageCategories
+                        "
+                        v-model:open="filtersOpen">
+                        <PopoverTrigger as-child>
+                            <button
+                                type="button"
+                                :aria-label="
+                                    filterCount ? `Filters, ${filterCount} active` : 'Filters'
+                                "
+                                title="Filters"
+                                class="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-text-secondary hover:bg-tertiary data-[state=open]:bg-tertiary">
+                                <AdjustmentsHorizontalIcon class="size-4" aria-hidden="true" />
+                                <span class="hidden xl:inline">Filters</span>
+                                <span v-if="filterCount" class="tabular-nums">{{
+                                    filterCount
+                                }}</span>
+                            </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                            align="end"
+                            aria-label="History filters"
+                            class="grid w-60 gap-3 p-3 text-sm">
+                            <label v-if="stages.length" class="grid gap-1">
+                                Stage
+                                <select v-model="stage" class="history-control">
+                                    <option :value="null">All stages</option>
+                                    <option value="">No stage</option>
+                                    <option v-for="item in stages" :key="item" :value="item">
+                                        {{ item }}
+                                    </option>
+                                </select>
+                            </label>
+                            <label v-if="categories.length" class="grid gap-1">
+                                Category
+                                <select v-model="category" class="history-control">
+                                    <option :value="null">All categories</option>
+                                    <option value="">Uncategorized</option>
+                                    <option
+                                        v-for="item in categories"
+                                        :key="item.id"
+                                        :value="item.id">
+                                        {{ item.name }}
+                                    </option>
+                                </select>
+                            </label>
+                            <template v-if="view === 'timeline'">
+                                <label class="grid gap-1">
+                                    Activity type
+                                    <select
+                                        v-model="activityType"
+                                        aria-label="Activity type"
+                                        class="history-control">
+                                        <option value="all">All activity</option>
+                                        <option value="calendar">Calendar</option>
+                                        <option value="unlinked">Calendar without task</option>
+                                    </select>
+                                </label>
+                                <label class="grid gap-1">
+                                    Order
+                                    <select v-model="oldestFirst" class="history-control">
+                                        <option :value="false">Newest first</option>
+                                        <option :value="true">Oldest first</option>
+                                    </select>
+                                </label>
+                            </template>
+                            <button
+                                v-if="filterCount"
+                                type="button"
+                                class="justify-self-start text-xs text-text-secondary hover:underline"
+                                @click="clearFilters">
+                                Clear filters
+                            </button>
+                            <button
+                                v-if="canManageCategories"
+                                type="button"
+                                class="justify-self-start text-sm text-text-secondary hover:underline"
+                                @click="
+                                    filtersOpen = false;
+                                    manage = true;
+                                ">
+                                Manage categories
+                            </button>
+                        </PopoverContent>
+                    </Popover>
+                </template>
+                <slot name="actions" />
+            </div>
+        </div>
+
+        <p
+            v-if="historyError || categoryError"
+            role="alert"
+            class="py-3 text-sm text-text-secondary">
+            Some history could not be loaded.
+            <button v-if="historyError" type="button" class="ml-1 underline" @click="retry">
+                Retry
+            </button>
+        </p>
+
+        <template v-if="detailTask">
+            <div class="border-b border-row-separator py-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="flex min-w-0 items-start gap-2">
                         <button
-                            v-for="task in group.tasks"
-                            :key="task.id"
                             type="button"
-                            class="my-0.5 flex w-full items-start gap-2 rounded-r-lg py-2 pl-3 pr-3 text-left text-sm"
-                            :class="
-                                selectedFilter === task.id
-                                    ? 'bg-tertiary font-medium'
-                                    : 'text-text-secondary hover:bg-tertiary'
-                            "
-                            :aria-pressed="selectedFilter === task.id"
-                            @click="selectedFilter = task.id">
-                            <span
-                                class="mt-1 size-1.5 shrink-0 rounded-full"
-                                :style="{ background: group.color }" /><span class="flex-1"
-                                ><span class="line-clamp-2">{{ task.name }}</span
-                                ><span
-                                    v-if="task.is_done || task.is_canceled"
-                                    class="mt-1 block text-[10px] font-normal"
-                                    >{{ task.is_canceled ? 'Canceled' : 'Done' }}</span
-                                ></span
-                            ><span class="text-xs">{{ taskCounts.get(task.id) ?? 0 }}</span>
+                            :aria-label="backLabel"
+                            :title="backLabel"
+                            class="-ml-1 inline-grid size-8 shrink-0 place-items-center rounded-md text-text-secondary hover:bg-tertiary hover:text-text-primary"
+                            @click="selectView(view)">
+                            <ArrowLeftIcon class="size-4" aria-hidden="true" />
+                        </button>
+                        <div class="min-w-0">
+                            <h2
+                                ref="detailHeading"
+                                tabindex="-1"
+                                class="break-words text-xl font-semibold focus:outline-none">
+                                {{ activeProblem?.title ?? detailTask.name }}
+                            </h2>
+                            <p
+                                class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-text-secondary">
+                                <span>{{ status(detailTask) }}</span
+                                ><span v-if="detailTask.stage">{{ detailTask.stage }}</span>
+                                <span v-if="detailTask.category_id">{{
+                                    categoryMap.get(detailTask.category_id)?.name
+                                }}</span>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 text-sm">
+                        <button
+                            v-if="canUpdateTasks()"
+                            type="button"
+                            class="history-action"
+                            @click="editTask = true">
+                            Edit task
+                        </button>
+                        <button
+                            type="button"
+                            class="history-action"
+                            @click="emit('openActivity', detailTask)">
+                            Open activity
                         </button>
                     </div>
                 </div>
-                <p v-if="categoryError" class="px-4 py-3 text-xs text-text-secondary">
-                    Category labels could not be loaded.
-                </p>
-            </aside>
+            </div>
+            <div
+                v-if="relationshipTaskIds.has(detailTask.id)"
+                class="border-b border-row-separator py-4">
+                <h3 class="mb-3 text-sm font-medium">Task relationships</h3>
+                <TaskRelationshipMap
+                    :key="detailTask.id"
+                    :task-id="detailTask.id"
+                    :tasks="tasks"
+                    :relationships="taskLinks.relationships.value"
+                    @open-activity="selectTask" />
+            </div>
+            <ProjectHistoryTimeline :records="activeProblem?.updates ?? taskRecords" focused />
+            <p
+                v-if="!(activeProblem?.updates ?? taskRecords).length && !historyError"
+                class="history-empty">
+                {{ loading ? 'Loading activity…' : 'No activity recorded for this task.' }}
+            </p>
+        </template>
 
-            <section class="history-timeline min-w-0">
-                <p
-                    v-if="calendar.isError.value || legacy.isError.value || taskLinks.isError.value"
-                    role="alert"
-                    class="px-5 py-3 text-sm text-text-secondary">
-                    Some history could not be loaded.
+        <template v-else-if="view === 'timeline'">
+            <ProjectHistoryTimeline :records="timeline" @select-task="selectTask" />
+            <p v-if="!timeline.length && !historyError" class="history-empty">
+                {{ loading ? 'Loading activity…' : 'No activity matches this view.' }}
+            </p>
+        </template>
+
+        <template v-else-if="view === 'tasks'">
+            <ul class="divide-y divide-row-separator">
+                <li v-for="task in taskList" :key="task.id">
+                    <button type="button" class="history-list-row" @click="selectTask(task)">
+                        <span class="min-w-0">
+                            <span class="block break-words font-medium">{{ task.name }}</span>
+                            <span
+                                v-if="task.stage || task.category_id"
+                                class="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-text-secondary">
+                                <span v-if="task.stage">{{ task.stage }}</span>
+                                <span
+                                    v-if="task.category_id"
+                                    class="inline-flex items-center gap-1.5">
+                                    <span
+                                        class="size-2 rounded-full"
+                                        :style="{
+                                            background: categoryMap.get(task.category_id)?.color,
+                                        }" />{{ categoryMap.get(task.category_id)?.name }}
+                                </span>
+                            </span>
+                        </span>
+                        <span class="text-xs text-text-secondary">{{ status(task) }}</span>
+                        <ChevronRightIcon class="size-4 text-icon-default" aria-hidden="true" />
+                    </button>
+                </li>
+            </ul>
+            <p v-if="!taskList.length" class="history-empty">No tasks match this view.</p>
+        </template>
+
+        <template v-else>
+            <ul class="divide-y divide-row-separator">
+                <li v-for="problem in visibleProblems" :key="problem.id">
                     <button
                         type="button"
-                        class="underline"
-                        @click="
-                            calendar.refetch();
-                            legacy.refetch();
-                            taskLinks.refetch();
-                        ">
-                        Retry
+                        class="history-list-row"
+                        @click="selectedProblemId = problem.id">
+                        <span class="min-w-0">
+                            <span class="block break-words font-medium">{{ problem.title }}</span>
+                            <span
+                                v-if="problem.title !== problem.task.name"
+                                class="mt-1 block text-xs text-text-secondary"
+                                >{{ problem.task.name }}</span
+                            >
+                        </span>
+                        <span class="text-xs capitalize text-text-secondary">{{
+                            problem.outcome ??
+                            (relationshipTaskIds.has(problem.task.id) ? 'Linked work' : '')
+                        }}</span>
+                        <ChevronRightIcon class="size-4 text-icon-default" aria-hidden="true" />
                     </button>
-                </p>
-                <p
-                    v-if="!days.size && (calendar.isPending.value || legacy.isPending.value)"
-                    class="px-5 py-10 text-center text-sm text-text-secondary">
-                    Loading history…
-                </p>
-                <p
-                    v-else-if="!days.size"
-                    class="px-5 py-10 text-center text-sm text-text-secondary">
-                    No activity yet
-                </p>
-                <section v-for="[date, day] in days" :key="date" class="px-5 pb-3 pt-5">
-                    <h3 class="mb-4 text-xs font-medium text-text-secondary">
-                        {{ getLocalizedDayJs(day[0]!.date).format('ddd, MMM D, YYYY') }}
-                    </h3>
-                    <div class="timeline-spine">
-                        <article
-                            v-for="record in day"
-                            :id="'history-' + record.id"
-                            :key="record.id"
-                            class="record-wrap"
-                            :style="{
-                                '--record-color': record.color,
-                                '--record-indent':
-                                    record.legacy?.parent_id || record.legacy?.issue_id
-                                        ? '14px'
-                                        : '0px',
-                                marginLeft: 'var(--record-indent)',
-                            }">
-                            <div class="record-card">
-                                <span class="record-icon"
-                                    ><component :is="record.icon" class="size-4"
-                                /></span>
-                                <div class="min-w-0 flex-1">
-                                    <div
-                                        class="flex flex-wrap items-center gap-2 text-xs text-text-secondary">
-                                        <span>{{ record.label }}</span>
-                                        <time :datetime="record.date">{{
-                                            getLocalizedDayJs(record.date).format('HH:mm')
-                                        }}</time>
-                                        <a
-                                            v-if="record.calendarUrl"
-                                            :href="record.calendarUrl"
-                                            class="underline underline-offset-2"
-                                            >Open in Calendar</a
-                                        >
-                                    </div>
-                                    <div class="mt-1 break-words text-sm font-medium">
-                                        {{ record.title }}
-                                    </div>
-                                    <div
-                                        v-if="record.task && record.title !== record.task.name"
-                                        class="mt-1 text-xs text-text-secondary">
-                                        {{ record.task.name }}
-                                    </div>
-                                    <div
-                                        v-if="record.note"
-                                        class="history-markdown mt-2 text-sm"
-                                        v-html="renderNotes(record.note)" />
-                                    <a
-                                        v-if="record.legacy?.parent_id"
-                                        :href="'#history-' + record.legacy.parent_id"
-                                        class="text-xs text-text-secondary underline"
-                                        >Previous record</a
-                                    >
-                                    <button
-                                        v-if="mapRecords.has(record.id)"
-                                        type="button"
-                                        class="mt-1 block text-left text-xs font-medium text-accent-400 hover:underline"
-                                        :aria-expanded="expandedMap === record.id"
-                                        :aria-controls="'task-map-' + record.id"
-                                        @click="
-                                            expandedMap =
-                                                expandedMap === record.id ? null : record.id
-                                        ">
-                                        {{
-                                            expandedMap === record.id
-                                                ? 'Hide task map'
-                                                : 'Show task map'
-                                        }}
-                                    </button>
-                                    <TaskRelationshipMap
-                                        v-if="
-                                            record.task &&
-                                            mapRecords.has(record.id) &&
-                                            expandedMap === record.id
-                                        "
-                                        :id="'task-map-' + record.id"
-                                        :task-id="record.task.id"
-                                        :tasks="tasks"
-                                        :relationships="taskLinks.relationships.value"
-                                        class="mt-2 border-t border-row-separator pt-2"
-                                        @open-activity="emit('openActivity', $event)" />
-                                </div>
-                            </div>
-                        </article>
-                    </div>
-                </section>
-            </section>
-        </div>
+                </li>
+            </ul>
+            <p v-if="!visibleProblems.length && !historyError" class="history-empty">
+                {{ loading ? 'Loading problems…' : 'No recorded problems match this view.' }}
+            </p>
+        </template>
     </div>
+    <TaskEditModal
+        v-if="editTask && detailTask"
+        :key="detailTask.id"
+        v-model:show="editTask"
+        :task="detailTask" />
     <TaskCategoryManager v-model:show="manage" />
 </template>
 
 <style scoped>
-.history-layout {
-    display: grid;
-    grid-template-columns: 230px minmax(0, 1fr);
-    min-height: 600px;
-}
-.history-explorer {
-    padding-bottom: 24px;
-}
-.timeline-spine {
-    margin-left: 15px;
-    border-left: 1px solid color-mix(in srgb, #9ca3af 28%, transparent);
-    padding-left: 20px;
-}
-.record-wrap {
-    position: relative;
-    padding-bottom: 8px;
-}
-.record-wrap:before {
-    content: '';
-    position: absolute;
-    top: 24px;
-    left: calc(-21px - var(--record-indent, 0px));
-    width: calc(20px + var(--record-indent, 0px));
-    border-top: 1px solid color-mix(in srgb, var(--record-color) 25%, transparent);
-}
-.record-card {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    text-align: left;
+.history-control {
+    height: 2rem;
     width: 100%;
-    padding: 10px 12px;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    transition: background-color 0.15s;
+    border: 1px solid var(--theme-color-default-background-separator);
+    border-radius: 0.375rem;
+    background-color: var(--theme-color-default-background);
+    padding-block: 0.2rem;
+    padding-inline-start: 0.55rem;
+    padding-inline-end: 1.7rem;
+    font-size: 0.8125rem;
 }
-.record-card:hover {
-    background: color-mix(in srgb, var(--record-color) 4%, transparent);
+.history-list-row {
+    @apply grid w-full grid-cols-[minmax(0,1fr)_auto_1rem] items-center gap-4 px-2 py-3 text-left text-sm hover:bg-tertiary;
 }
-.record-card:focus-visible {
-    background: color-mix(in srgb, var(--record-color) 6%, transparent);
+.history-action {
+    @apply rounded-md px-2.5 py-1.5 text-text-secondary hover:bg-tertiary hover:text-text-primary;
 }
-.record-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    flex-shrink: 0;
-    color: var(--record-color);
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--record-color) 10%, transparent);
-}
-.history-markdown :deep(h1),
-.history-markdown :deep(h2),
-.history-markdown :deep(h3) {
-    font-size: 1em;
-    font-weight: 600;
-    margin: 1em 0 0.5em;
-}
-.history-markdown :deep(p) {
-    margin-bottom: 0.75em;
-    overflow-wrap: anywhere;
-}
-.history-markdown :deep(ul) {
-    list-style: disc;
-    padding-left: 1.2em;
-}
-.history-markdown :deep(ol) {
-    list-style: decimal;
-    padding-left: 1.2em;
-}
-.history-markdown :deep(a) {
-    text-decoration: underline;
-}
-.history-markdown :deep(pre) {
-    padding: 10px;
-    border-radius: 6px;
-    overflow: auto;
-    background: #9ca3af15;
-}
-.history-markdown :deep(blockquote) {
-    border-left: 2px solid #9ca3af55;
-    padding-left: 12px;
-}
-.history-markdown :deep(input) {
-    margin-right: 6px;
-    accent-color: #5c9a7c;
-}
-.history-markdown :deep(ul:has(> li > input[type='checkbox'])) {
-    list-style: none;
-    padding-left: 0;
-}
-@media (max-width: 1250px) {
-    .history-layout {
-        grid-template-columns: 200px minmax(0, 1fr);
-    }
-}
-@media (max-width: 700px) {
-    .history-layout {
-        display: block;
-    }
-    .history-explorer {
-        max-height: 220px;
-        overflow: auto;
-        border-right: 0;
-        border-bottom: 1px solid #9ca3af33;
-    }
-    .timeline-spine {
-        padding-left: 10px;
-    }
-    .record-wrap:before {
-        width: calc(10px + var(--record-indent, 0px));
-        left: calc(-11px - var(--record-indent, 0px));
-    }
+.history-empty {
+    @apply py-12 text-center text-sm text-text-secondary;
 }
 </style>
