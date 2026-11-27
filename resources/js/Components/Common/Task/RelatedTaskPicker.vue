@@ -11,8 +11,8 @@ const value = defineModel<string | null>({ required: true });
 const props = defineProps<{ projectId: string; excludedIds?: string[]; disabled?: boolean }>();
 const { tasks, isPending, isError, refetch } = useTasksQuery();
 const { projects } = useProjectsQuery();
-const projectNames = computed(
-    () => new Map(projects.value.map((project) => [project.id, project.name]))
+const projectsById = computed(
+    () => new Map(projects.value.map((project) => [project.id, project]))
 );
 const open = ref(false);
 const search = ref('');
@@ -23,7 +23,7 @@ const options = computed(() => {
     const excluded = new Set(props.excludedIds);
     return tasks.value
         .filter((task) => {
-            const project = projectNames.value.get(task.project_id) ?? '';
+            const project = projectsById.value.get(task.project_id)?.name ?? '';
             return (
                 !excluded.has(task.id) &&
                 `${task.name} ${project}`.toLocaleLowerCase().includes(query)
@@ -53,12 +53,22 @@ function select(id: string | null) {
                     type="button"
                     :disabled="disabled || isPending || isError"
                     class="flex h-9 w-full items-center justify-between gap-2 rounded-md border border-input-border bg-input-background px-3 text-left text-sm text-text-primary shadow-sm focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
-                    <span v-if="selected" class="min-w-0 truncate">
-                        {{ selected.name }}
+                    <span
+                        v-if="selected"
+                        class="flex min-w-0 flex-1 items-center justify-between gap-2">
+                        <span class="min-w-0 truncate">{{ selected.name }}</span>
                         <span
-                            v-if="projectNames.get(selected.project_id)"
-                            class="text-xs text-text-secondary">
-                            · {{ projectNames.get(selected.project_id) }}
+                            v-if="projectsById.has(selected.project_id)"
+                            class="flex max-w-[45%] shrink-0 items-center gap-1.5 text-xs text-text-secondary">
+                            <span
+                                class="size-1.5 shrink-0 rounded-full"
+                                aria-hidden="true"
+                                :style="{
+                                    backgroundColor: projectsById.get(selected.project_id)?.color,
+                                }" />
+                            <span class="truncate">{{
+                                projectsById.get(selected.project_id)?.name
+                            }}</span>
                         </span>
                     </span>
                     <span v-else class="truncate text-text-secondary">Select a task</span>
@@ -84,12 +94,14 @@ function select(id: string | null) {
                             :key="task.id"
                             :value="task.id"
                             class="cursor-default rounded-sm px-2 py-1.5 text-sm text-text-primary outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground">
-                            <p class="break-words">{{ task.name }}</p>
-                            <p
-                                v-if="projectNames.get(task.project_id)"
-                                class="text-xs text-text-secondary">
-                                {{ projectNames.get(task.project_id) }}
-                            </p>
+                            <div class="flex items-baseline justify-between gap-3">
+                                <span class="min-w-0 break-words">{{ task.name }}</span>
+                                <span
+                                    v-if="projectsById.has(task.project_id)"
+                                    class="max-w-[45%] shrink-0 truncate text-xs opacity-75">
+                                    {{ projectsById.get(task.project_id)?.name }}
+                                </span>
+                            </div>
                         </ComboboxItem>
                         <p v-if="!options.length" class="px-2 py-2 text-xs text-text-secondary">
                             No matching tasks
