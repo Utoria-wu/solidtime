@@ -23,6 +23,7 @@ import ProjectHistoryTimeline, { type ProjectHistoryRecord } from './ProjectHist
 import TaskRelationshipMap from './TaskRelationshipMap.vue';
 import TaskCategoryManager from './TaskCategoryManager.vue';
 import TaskEditModal from './TaskEditModal.vue';
+import TaskMoreOptionsDropdown from './TaskMoreOptionsDropdown.vue';
 
 const props = defineProps<{ projectId: string; tasks: Task[] }>();
 const emit = defineEmits<{ openActivity: [task: Task] }>();
@@ -55,10 +56,11 @@ const filterCount = computed(
         Number(view.value === 'timeline' && activityType.value !== 'all')
 );
 const manage = ref(false);
-const editTask = ref(false);
+const editTaskId = ref<string | null>(null);
 const detailHeading = ref<HTMLElement | null>(null);
 const categoryMap = computed(() => new Map(categories.value.map((item) => [item.id, item])));
 const taskMap = computed(() => new Map(props.tasks.map((task) => [task.id, task])));
+const editingTask = computed(() => taskMap.value.get(editTaskId.value ?? ''));
 const activeTask = computed(() => taskMap.value.get(selectedTaskId.value ?? ''));
 const stages = computed(() =>
     [
@@ -323,12 +325,9 @@ watch([selectedTaskId, selectedProblemId], async ([taskId, problemId]) => {
     await nextTick();
     detailHeading.value?.focus();
 });
-watch(
-    () => detailTask.value?.id,
-    (id) => {
-        if (!id) editTask.value = false;
-    }
-);
+watch(editingTask, (task) => {
+    if (!task) editTaskId.value = null;
+});
 </script>
 
 <template>
@@ -513,7 +512,7 @@ watch(
                             v-if="canUpdateTasks()"
                             type="button"
                             class="history-action"
-                            @click="editTask = true">
+                            @click="editTaskId = detailTask.id">
                             Edit task
                         </button>
                         <button
@@ -553,8 +552,11 @@ watch(
 
         <template v-else-if="view === 'tasks'">
             <ul class="divide-y divide-row-separator">
-                <li v-for="task in taskList" :key="task.id">
-                    <button type="button" class="history-list-row" @click="selectTask(task)">
+                <li v-for="task in taskList" :key="task.id" class="flex items-center gap-1 pr-2">
+                    <button
+                        type="button"
+                        class="flex min-w-0 flex-1 items-center justify-between gap-3 px-2 py-3 text-left text-sm hover:bg-tertiary"
+                        @click="selectTask(task)">
                         <span class="min-w-0">
                             <span class="block break-words font-medium">{{ task.name }}</span>
                             <span
@@ -572,9 +574,13 @@ watch(
                                 </span>
                             </span>
                         </span>
-                        <span class="text-xs text-text-secondary">{{ status(task) }}</span>
-                        <ChevronRightIcon class="size-4 text-icon-default" aria-hidden="true" />
+                        <span class="shrink-0 text-xs text-text-secondary">{{ status(task) }}</span>
                     </button>
+                    <TaskMoreOptionsDropdown
+                        v-if="canUpdateTasks()"
+                        :task="task"
+                        edit-only
+                        @edit="editTaskId = task.id" />
                 </li>
             </ul>
             <p v-if="!taskList.length" class="history-empty">No tasks match this view.</p>
@@ -609,10 +615,15 @@ watch(
         </template>
     </div>
     <TaskEditModal
-        v-if="editTask && detailTask"
-        :key="detailTask.id"
-        v-model:show="editTask"
-        :task="detailTask" />
+        v-if="editingTask"
+        :key="editingTask.id"
+        :show="true"
+        :task="editingTask"
+        @update:show="
+            (open) => {
+                if (!open) editTaskId = null;
+            }
+        " />
     <TaskCategoryManager v-model:show="manage" />
 </template>
 
