@@ -5,7 +5,13 @@ import type { Task } from '@/packages/api/src';
 import { taskRelationshipGraph } from '@/utils/taskRelationshipGraph';
 import { taskRelationshipKinds, type TaskRelationship } from '@/utils/useTaskRelationships';
 
-const props = defineProps<{ taskId: string; tasks: Task[]; relationships: TaskRelationship[] }>();
+const props = defineProps<{
+    taskId: string;
+    tasks: Task[];
+    relationships: TaskRelationship[];
+    projectId: string;
+    projectNames: Map<string, string>;
+}>();
 const emit = defineEmits<{ openActivity: [task: Task] }>();
 const board = ref<HTMLElement | null>(null);
 const hovered = ref<string | null>(null);
@@ -159,6 +165,14 @@ function relationshipText(edge: TaskRelationship) {
                     <span class="block break-words text-sm font-medium text-text-primary">{{
                         node.task.name
                     }}</span>
+                    <span
+                        v-if="
+                            node.task.project_id !== projectId &&
+                            projectNames.has(node.task.project_id)
+                        "
+                        class="block break-words text-xs text-text-secondary">
+                        {{ projectNames.get(node.task.project_id) }}
+                    </span>
                     <span class="block text-xs text-text-secondary">{{
                         node.task.is_canceled ? 'Canceled' : node.task.is_done ? 'Done' : 'Active'
                     }}</span>

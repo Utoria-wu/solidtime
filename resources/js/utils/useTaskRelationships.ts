@@ -76,7 +76,7 @@ export function useTaskRelationships(projectId: string) {
             ...(previous ?? []).filter((link) => link.id !== result.data.id),
             result.data,
         ]);
-        void client.invalidateQueries({ queryKey });
+        void client.invalidateQueries({ queryKey: ['taskRelationships', organization] });
         return true;
     }
 
@@ -100,7 +100,7 @@ export function useTaskRelationships(projectId: string) {
         client.setQueryData<TaskRelationship[]>(queryKey, (previous) =>
             (previous ?? []).filter((link) => link.id !== relationshipId)
         );
-        void client.invalidateQueries({ queryKey });
+        void client.invalidateQueries({ queryKey: ['taskRelationships', organization] });
         return true;
     }
 

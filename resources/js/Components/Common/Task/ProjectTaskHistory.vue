@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue';
+import { router } from '@inertiajs/vue3';
 import { useQuery } from '@tanstack/vue-query';
 import {
     AdjustmentsHorizontalIcon,
@@ -13,6 +14,8 @@ import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import { Popover, PopoverContent, PopoverTrigger } from '@/packages/ui/src/popover';
 import { historyKinds, useTaskCategories, useTaskHistory } from '@/utils/useTaskHistory';
 import { useTaskRelationships } from '@/utils/useTaskRelationships';
+import { useTasksQuery } from '@/utils/useTasksQuery';
+import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import {
     canCreateTags,
     canUpdateAllTasks,
@@ -34,6 +37,11 @@ const emit = defineEmits<{ openActivity: [task: Task] }>();
 const { categories, isError: categoryError } = useTaskCategories();
 const legacy = useTaskHistory(props.projectId);
 const taskLinks = useTaskRelationships(props.projectId);
+const { tasks: organizationTasks } = useTasksQuery();
+const { projects } = useProjectsQuery();
+const projectNames = computed(
+    () => new Map(projects.value.map((project) => [project.id, project.name]))
+);
 
 const views = [
     { key: 'timeline', label: 'Timeline' },
@@ -393,6 +401,31 @@ function selectTask(task: Task) {
     selectedProblemId.value = null;
 }
 
+function openRelationshipTask(task: Task) {
+    if (task.project_id === props.projectId) {
+        selectTask(task);
+    } else {
+        router.get(`/projects/${task.project_id}`, { view: 'history', historyTask: task.id });
+    }
+}
+
+const requestedTaskId =
+    typeof window === 'undefined'
+        ? null
+        : new URLSearchParams(window.location.search).get('historyTask');
+if (requestedTaskId) {
+    let opened = false;
+    watch(
+        () => taskMap.value.get(requestedTaskId),
+        (task) => {
+            if (!task || opened) return;
+            opened = true;
+            selectTask(task);
+        },
+        { immediate: true }
+    );
+}
+
 function status(task: Task) {
     return task.is_canceled ? 'Canceled' : task.is_done ? 'Done' : 'Active';
 }
@@ -653,9 +686,11 @@ watch(editingTask, (task) => {
                 <TaskRelationshipMap
                     :key="detailTask.id"
                     :task-id="detailTask.id"
-                    :tasks="tasks"
+                    :tasks="organizationTasks"
                     :relationships="taskLinks.relationships.value"
-                    @open-activity="selectTask" />
+                    :project-id="projectId"
+                    :project-names="projectNames"
+                    @open-activity="openRelationshipTask" />
             </div>
             <ProjectHistoryTimeline :records="activeProblem?.updates ?? taskRecords" focused />
             <p

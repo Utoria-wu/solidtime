@@ -743,6 +743,12 @@ const TaskStoreRequest = z
         category_id: z.string().nullable().optional(),
         stage: z.string().nullable().optional(),
         markdown_notes: z.string().nullable().optional(),
+        relationship: z
+            .object({
+                related_task_id: z.string().uuid(),
+                kind: z.enum(['fixes', 'verifies', 'follows_up_on']),
+            })
+            .optional(),
         due_date: z.union([z.string(), z.null()]).optional(),
         estimated_time: z.union([z.number(), z.null()]).optional(),
     })
