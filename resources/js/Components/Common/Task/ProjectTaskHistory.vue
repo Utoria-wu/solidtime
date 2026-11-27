@@ -31,7 +31,8 @@ const { categories, isError: categoryError } = useTaskCategories();
 const legacy = useTaskHistory(props.projectId);
 const taskLinks = useTaskRelationships(props.projectId);
 const expandedMap = ref<string | null>(null);
-const selectedTask = ref<string | null>(null);
+const unlinkedCalendar = 'unlinked-calendar';
+const selectedFilter = ref<string | null>(null);
 const groupBy = ref<'category' | 'stage'>('category');
 const collapsed = ref(new Set<string>());
 const manage = ref(false);
@@ -59,6 +60,7 @@ const calendar = useQuery({
                 queries: {
                     project_ids: [project],
                     member_id: member ?? undefined,
+                    active: 'false',
                     offset: entries.length || undefined,
                 },
                 signal,
@@ -69,9 +71,10 @@ const calendar = useQuery({
     },
 });
 
-type Record = {
+type HistoryRecord = {
     id: string;
-    task: Task;
+    task: Task | null;
+    title: string;
     date: string;
     label: string;
     note: string | null;
@@ -82,12 +85,13 @@ type Record = {
 };
 
 const records = computed(() => {
-    const result: Record[] = [];
+    const result: HistoryRecord[] = [];
     for (const task of props.tasks) {
         if (task.created_at)
             result.push({
                 id: `created-${task.id}`,
                 task,
+                title: task.name,
                 date: task.created_at,
                 label: 'Created',
                 note: task.markdown_notes ?? null,
@@ -98,6 +102,7 @@ const records = computed(() => {
             result.push({
                 id: `completed-${task.id}`,
                 task,
+                title: task.name,
                 date: task.done_at,
                 label: 'Completed',
                 note: task.completion_notes ?? null,
@@ -106,8 +111,8 @@ const records = computed(() => {
             });
     }
     for (const event of calendar.data.value ?? []) {
-        const task = event.task_id ? taskMap.value.get(event.task_id) : undefined;
-        if (!task || !event.end) continue;
+        if (!event.end) continue;
+        const task = (event.task_id && taskMap.value.get(event.task_id)) || null;
         const query = new URLSearchParams({
             date: getLocalizedDayJs(event.start).format('YYYY-MM-DD'),
             entry: event.id,
@@ -115,6 +120,7 @@ const records = computed(() => {
         result.push({
             id: event.id,
             task,
+            title: event.description?.trim() || task?.name || 'Untitled Calendar entry',
             date: event.start,
             label: 'Calendar',
             note: event.markdown_notes ?? null,
@@ -129,6 +135,7 @@ const records = computed(() => {
         result.push({
             id: entry.id,
             task,
+            title: task.name,
             date: entry.occurred_at,
             label: historyKinds[entry.kind].label,
             note: entry.markdown_notes,
@@ -142,15 +149,18 @@ const records = computed(() => {
 
 const taskCounts = computed(() => {
     const counts = new Map<string, number>();
-    for (const record of records.value)
-        counts.set(record.task.id, (counts.get(record.task.id) ?? 0) + 1);
+    for (const record of records.value) {
+        const key = record.task?.id ?? unlinkedCalendar;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
     return counts;
 });
 
 const days = computed(() => {
-    const result = new Map<string, Record[]>();
+    const result = new Map<string, HistoryRecord[]>();
     for (const record of records.value) {
-        if (selectedTask.value && record.task.id !== selectedTask.value) continue;
+        if (selectedFilter.value && selectedFilter.value !== (record.task?.id ?? unlinkedCalendar))
+            continue;
         const date = getLocalizedDayJs(record.date).format('YYYY-MM-DD');
         const day = result.get(date) ?? [];
         day.push(record);
@@ -166,15 +176,15 @@ const mapRecords = computed(() => {
         linked.add(edge.task_id);
         linked.add(edge.related_task_id);
     }
-    const anchors = new Map<string, Record>();
-    const priority = (record: Record) =>
+    const anchors = new Map<string, HistoryRecord>();
+    const priority = (record: HistoryRecord) =>
         record.legacy?.kind === 'problem' ? 0 : record.id.startsWith('created-') ? 1 : 2;
     for (const day of days.value.values()) {
         for (const record of day) {
-            if (!linked.has(record.task.id)) continue;
-            const current = anchors.get(record.task.id);
-            if (!current || priority(record) < priority(current))
-                anchors.set(record.task.id, record);
+            const taskId = record.task?.id;
+            if (!taskId || !linked.has(taskId)) continue;
+            const current = anchors.get(taskId);
+            if (!current || priority(record) < priority(current)) anchors.set(taskId, record);
         }
     }
     return new Set([...anchors.values()].map((record) => record.id));
@@ -232,10 +242,27 @@ function toggle(id: string) {
                     </button>
                 </div>
                 <button
+                    type="button"
                     class="mx-2 flex w-[calc(100%-1rem)] items-center justify-between rounded-lg px-3 py-2 text-left text-sm"
-                    :class="!selectedTask ? 'bg-tertiary font-medium' : 'text-text-secondary'"
-                    @click="selectedTask = null">
-                    All tasks<span class="text-xs">{{ tasks.length }}</span>
+                    :class="!selectedFilter ? 'bg-tertiary font-medium' : 'text-text-secondary'"
+                    :aria-pressed="!selectedFilter"
+                    @click="selectedFilter = null">
+                    All activity<span class="text-xs">{{ tasks.length }} tasks</span>
+                </button>
+                <button
+                    v-if="taskCounts.has(unlinkedCalendar)"
+                    type="button"
+                    class="mx-2 mt-1 flex w-[calc(100%-1rem)] items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-tertiary"
+                    :class="
+                        selectedFilter === unlinkedCalendar
+                            ? 'bg-tertiary font-medium'
+                            : 'text-text-secondary'
+                    "
+                    :aria-pressed="selectedFilter === unlinkedCalendar"
+                    @click="selectedFilter = unlinkedCalendar">
+                    <ClockIcon class="size-4 shrink-0" />
+                    <span class="flex-1">Calendar without task</span>
+                    <span class="text-xs">{{ taskCounts.get(unlinkedCalendar) }}</span>
                 </button>
                 <div v-for="[id, group] in groups" :key="id" class="mt-4">
                     <button
@@ -261,11 +288,12 @@ function toggle(id: string) {
                             type="button"
                             class="my-0.5 flex w-full items-start gap-2 rounded-r-lg py-2 pl-3 pr-3 text-left text-sm"
                             :class="
-                                selectedTask === task.id
+                                selectedFilter === task.id
                                     ? 'bg-tertiary font-medium'
                                     : 'text-text-secondary hover:bg-tertiary'
                             "
-                            @click="selectedTask = task.id">
+                            :aria-pressed="selectedFilter === task.id"
+                            @click="selectedFilter = task.id">
                             <span
                                 class="mt-1 size-1.5 shrink-0 rounded-full"
                                 :style="{ background: group.color }" /><span class="flex-1"
@@ -309,7 +337,7 @@ function toggle(id: string) {
                 <p
                     v-else-if="!days.size"
                     class="px-5 py-10 text-center text-sm text-text-secondary">
-                    No task activity yet
+                    No activity yet
                 </p>
                 <section v-for="[date, day] in days" :key="date" class="px-5 pb-3 pt-5">
                     <h3 class="mb-4 text-xs font-medium text-text-secondary">
@@ -348,6 +376,11 @@ function toggle(id: string) {
                                         >
                                     </div>
                                     <div class="mt-1 break-words text-sm font-medium">
+                                        {{ record.title }}
+                                    </div>
+                                    <div
+                                        v-if="record.task && record.title !== record.task.name"
+                                        class="mt-1 text-xs text-text-secondary">
                                         {{ record.task.name }}
                                     </div>
                                     <div
@@ -378,7 +411,9 @@ function toggle(id: string) {
                                     </button>
                                     <TaskRelationshipMap
                                         v-if="
-                                            mapRecords.has(record.id) && expandedMap === record.id
+                                            record.task &&
+                                            mapRecords.has(record.id) &&
+                                            expandedMap === record.id
                                         "
                                         :id="'task-map-' + record.id"
                                         :task-id="record.task.id"
